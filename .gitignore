@@ -1,0 +1,36 @@
+# Secrets — never commit
+.env
+.env.local
+*.env
+!.env.example
+
+# MCP config files that can hold credentials
+mcp.json
+.mcp.json
+mcp_config.json
+claude_desktop_config.json
+**/mcp*.json
+!**/mcp_schema.json
+
+# Environments
+.venv/
+venv/
+env/
+
+# Data & logs
+data/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+docs/implementation.md

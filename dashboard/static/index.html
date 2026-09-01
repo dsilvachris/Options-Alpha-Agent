@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>OPTIONS ALPHA AGENT</title>
+<style>
+:root{
+  --bg:#080b0d; --panel:#0d1216; --panel2:#111820; --line:#1d2a33;
+  --fg:#c9d6de; --dim:#5d7181; --amber:#ffb000; --green:#22e06a;
+  --red:#ff4d4d; --cyan:#35d6f5; --violet:#a97bff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:12px/1.5 "SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace}
+a{color:var(--cyan)}
+.head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:8px 14px;background:linear-gradient(180deg,#101820,#0a0f13);
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{color:var(--amber);font-weight:700;letter-spacing:.16em}
+.chip{border:1px solid var(--line);padding:2px 8px;border-radius:2px;color:var(--dim)}
+.chip b{color:var(--fg);font-weight:600}
+.chip.live{border-color:var(--red);color:var(--red)}
+.chip.dry{border-color:var(--amber);color:var(--amber)}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px;padding:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:3px;
+  display:flex;flex-direction:column;min-height:0}
+.panel>h2{margin:0;padding:6px 10px;font-size:10.5px;letter-spacing:.14em;
+  color:var(--amber);background:var(--panel2);border-bottom:1px solid var(--line);
+  text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.panel>h2 span{color:var(--dim);letter-spacing:.06em}
+.body{padding:8px 10px;overflow:auto;flex:1}
+.scroll{max-height:330px}
+.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}
+.span4{grid-column:span 4}.span5{grid-column:span 5}.span7{grid-column:span 7}
+@media(max-width:1100px){.span8,.span6,.span4,.span5,.span7{grid-column:span 12}}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;color:var(--dim);font-weight:500;padding:3px 6px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);
+  font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+td{padding:3px 6px;border-bottom:1px solid #131c22;vertical-align:top}
+tr:hover td{background:#101a20}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}.green{color:var(--green)}.red{color:var(--red)}
+.amber{color:var(--amber)}.cyan{color:var(--cyan)}.violet{color:var(--violet)}
+.pipe{display:flex;gap:6px;flex-wrap:wrap}
+.stage{flex:1;min-width:140px;border:1px solid var(--line);border-radius:2px;
+  padding:6px 8px;background:var(--panel2)}
+.stage.complete{border-color:#1f6b3f;box-shadow:inset 0 0 0 1px #12331f}
+.stage.pending{opacity:.42}
+.stage .n{font-size:10px;color:var(--dim);letter-spacing:.1em}
+.stage .l{color:var(--fg);margin:2px 0 4px;font-size:11.5px}
+.stage .c{font-size:10px}
+.evline{padding:2px 0;border-bottom:1px solid #121a20}
+.badge{display:inline-block;padding:0 6px;border-radius:2px;font-size:10px;
+  letter-spacing:.06em;border:1px solid}
+.b-TRADE{color:var(--green);border-color:#1f6b3f;background:#0c1f14}
+.b-WATCH{color:var(--amber);border-color:#6b4f13;background:#1f1708}
+.b-REJECT{color:var(--red);border-color:#6b2020;background:#1f0c0c}
+.b-EXPIRED{color:var(--dim);border-color:var(--line)}
+.b-EXIT{color:var(--cyan);border-color:#1a5566;background:#08191f}
+.sim{color:var(--violet);border:1px solid #43307a;background:#150e26;
+  padding:0 5px;border-radius:2px;font-size:9.5px;letter-spacing:.06em}
+tr.simrow td{opacity:.72}
+.b-ERROR{color:var(--red);border-color:var(--red)}
+.card{white-space:pre-wrap;background:#0a1015;border:1px solid var(--line);
+  border-left:2px solid var(--amber);padding:7px 9px;margin:5px 0;border-radius:2px;
+  font-size:11.5px}
+.card.s-TRADE{border-left-color:var(--green)}
+.card.s-REJECT{border-left-color:var(--red)}
+.card.s-WATCH{border-left-color:var(--amber)}
+.card.s-EXIT{border-left-color:var(--cyan)}
+.card.s-EXPIRED{border-left-color:var(--dim)}
+.meta{color:var(--dim);font-size:10px;margin-bottom:3px;letter-spacing:.05em}
+.checks{margin-top:5px;border-top:1px dashed var(--line);padding-top:4px}
+.chk{display:flex;gap:8px;font-size:10.5px;padding:1px 0}
+.chk .st{width:34px}
+.ok{color:var(--green)}.no{color:var(--red)}
+.gate{color:var(--violet)}
+.empty{color:var(--dim);padding:14px;text-align:center;font-style:italic}
+svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:14px;font-size:10px;color:var(--dim);padding:2px 0 6px}
+.legend i{display:inline-block;width:10px;height:2px;vertical-align:middle;margin-right:4px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11px}
+.kv div:nth-child(odd){color:var(--dim)}
+code{color:var(--cyan);font-size:10.5px;word-break:break-all}
+.toolbar{display:flex;gap:6px;align-items:center}
+button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+  padding:2px 8px;border-radius:2px;cursor:pointer;font:inherit;font-size:10.5px}
+button:hover{border-color:var(--amber);color:var(--amber)}
+button.on{border-color:var(--amber);color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="head">
+  <span class="brand">◤ OPTIONS ALPHA AGENT</span>
+  <span class="chip" id="c-mode">MODE <b>—</b></span>
+  <span class="chip">EQUITY <b id="c-eq">—</b></span>
+  <span class="chip">OPEN <b id="c-pos">—</b></span>
+  <span class="chip">REALIZED <b id="c-pnl">—</b></span>
+  <span class="chip" id="c-sim" hidden>SIMULATED <b id="c-simv">—</b></span>
+  <span class="chip">MCP CALLS <b id="c-mcp">—</b></span>
+  <span class="chip">CYCLE <b id="c-cycle">—</b></span>
+  <span class="chip">UPDATED <b id="c-upd">—</b></span>
+  <span class="chip">TZ <b>America/New_York</b></span>
+  <span class="toolbar"><button id="btn-auto" class="on">AUTO-REFRESH</button></span>
+</div>
+
+<div class="grid">
+  <div class="panel span12">
+    <h2>Decision Pipeline <span id="p-cycle"></span></h2>
+    <div class="body"><div class="pipe" id="pipeline"></div></div>
+  </div>
+
+  <div class="panel span5">
+    <h2>Regime Readings <span>volatility &amp; trend per underlying</span></h2>
+    <div class="body"><div id="regimes"></div></div>
+  </div>
+
+  <div class="panel span7">
+    <h2>MCP Activity <span id="mcp-stats">live Alpaca MCP tool call stream</span></h2>
+    <div class="body scroll"><div id="mcp"></div></div>
+  </div>
+
+  <div class="panel span7">
+    <h2>Open Positions <span id="pos-lim"></span></h2>
+    <div class="body"><div id="positions"></div></div>
+  </div>
+
+  <div class="panel span5">
+    <h2>WATCH Items <span>Section 5.1 lifecycle</span></h2>
+    <div class="body scroll"><div id="watch"></div></div>
+  </div>
+
+  <div class="panel span12">
+    <h2>Equity &amp; Baselines <span>agent vs unfiltered vs passive, % from start</span></h2>
+    <div class="body"><div id="equity"></div></div>
+  </div>
+
+  <div class="panel span7">
+    <h2>Reasoning Log <span>decision cards — taken, watched, declined</span></h2>
+    <div class="body scroll" style="max-height:560px"><div id="cards"></div></div>
+  </div>
+
+  <div class="panel span5">
+    <h2>Activity Ledger &amp; Outcomes <span>Section 8</span></h2>
+    <div class="body scroll" style="max-height:560px"><div id="monitor"></div></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = v => v==null?"—":"$"+Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const num = (v,d=4) => v==null?"—":Number(v).toFixed(d);
+// Timestamps arrive as UTC ISO strings and are rendered in market time.
+const ET = "America/New_York";
+const time = t => { if(!t) return "—";
+  try { return new Date(t).toLocaleTimeString("en-US",
+    {timeZone:ET, hour12:false, hour:"2-digit", minute:"2-digit", second:"2-digit"}); }
+  catch(e){ return String(t).slice(11,19); } };
+const stamp = t => { if(!t) return "—";
+  try { return new Date(t).toLocaleString("en-US",
+    {timeZone:ET, hour12:false, year:"numeric", month:"2-digit", day:"2-digit",
+     hour:"2-digit", minute:"2-digit", second:"2-digit"}) + " ET"; }
+  catch(e){ return String(t); } };
+const empty = m => `<div class="empty">${m}</div>`;
+
+function pipeline(p){
+  $("p-cycle").textContent = p.cycle_id ? `cycle ${p.cycle_id} · ${p.complete?"complete":"in progress"}` : "no cycle recorded";
+  $("pipeline").innerHTML = p.stages.map((s,i)=>{
+    const last = s.events.slice(-3).map(e=>
+      `<div class="evline"><span class="dim">${time(e.ts)}</span> ${e.symbol?`<span class="cyan">${esc(e.symbol)}</span> `:""}${esc(e.message)}</div>`
+    ).join("") || `<div class="dim">no events recorded</div>`;
+    return `<div class="stage ${s.status}">
+      <div class="n">STAGE ${i+1} · ${s.status.toUpperCase()} · ${s.count}</div>
+      <div class="l">${esc(s.label)}</div><div class="c">${last}</div></div>`;
+  }).join("");
+}
+
+function regimes(rows){
+  if(!rows.length) return $("regimes").innerHTML = empty("no readings recorded");
+  $("regimes").innerHTML = `<table><thead><tr><th>SYM</th><th>IV CONDITION</th><th>TREND</th>
+    <th class="num">ATM IV</th><th class="num">RV20</th><th class="num">IV/RV</th><th class="num">MA SEP</th></tr></thead><tbody>`
+    + rows.map(r=>{
+      if(r.status) return `<tr><td class="amber">${esc(r.symbol)}</td><td colspan="6" class="dim">${esc(r.status)}</td></tr>`;
+      const ivc = /elevated/.test(r.iv_condition||"") ? "green":"dim";
+      const tc = /uptrend/.test(r.trend_condition||"")?"green":/downtrend/.test(r.trend_condition||"")?"red":"dim";
+      return `<tr><td class="amber">${esc(r.symbol)}</td>
+        <td class="${ivc}">${esc(r.iv_condition)}</td><td class="${tc}">${esc(r.trend_condition)}</td>
+        <td class="num">${num(r.atm_iv)}</td><td class="num">${num(r.realized_vol)}</td>
+        <td class="num">${num(r.iv_rv_ratio,3)}</td><td class="num">${num(r.separation)}</td></tr>`;
+    }).join("") + `</tbody></table>`;
+}
+
+function mcp(m){
+  $("c-mcp").textContent = m.total;
+  $("mcp-stats").textContent = m.stats.slice(0,4).map(s=>`${s.tool}:${s.calls}`).join("  ") || "live Alpaca MCP tool call stream";
+  if(!m.calls.length) return $("mcp").innerHTML = empty("no MCP calls recorded yet — run a scan cycle");
+  $("mcp").innerHTML = `<table><thead><tr><th>TIME</th><th>TOOL</th><th>ARGUMENTS</th>
+    <th class="num">MS</th><th>RESPONSE</th></tr></thead><tbody>`
+    + m.calls.map(c=>`<tr>
+      <td class="dim">${time(c.ts)}</td>
+      <td class="${c.ok?'cyan':'red'}">${esc(c.tool)}</td>
+      <td><code>${esc(JSON.stringify(c.arguments||{}).slice(0,90))}</code></td>
+      <td class="num ${c.latency_ms>2000?'amber':''}">${c.latency_ms==null?"—":Math.round(c.latency_ms)}</td>
+      <td class="dim">${esc((c.ok?c.response_summary:("ERR "+(c.error||""))).slice(0,110))}</td>
+    </tr>`).join("") + `</tbody></table>`;
+}
+
+function positions(p){
+  $("c-pos").textContent = `${p.open_count}/${p.limit}`;
+  $("pos-lim").textContent = `${p.open_count} of ${p.limit} slots used (live)`
+    + (p.dry_run_open_count ? ` · ${p.dry_run_open_count} simulated` : "");
+  if(!p.open.length) return $("positions").innerHTML = empty("no open positions");
+  $("positions").innerHTML = `<table><thead><tr><th>SYM</th><th>STRUCTURE</th><th class="num">QTY</th>
+    <th class="num">CREDIT</th><th class="num">MAX LOSS</th><th>EXPIRY</th><th>EXITS</th></tr></thead><tbody>`
+    + p.open.map(r=>`<tr class="${r.dry_run?'simrow':''}">
+      <td class="amber">${esc(r.symbol)}${r.dry_run?' <span class="sim">SIM</span>':''}${r.reconciled?' <span class="sim">RECONCILED</span>':''}</td>
+      <td>${esc(r.structure)}</td><td class="num">${r.contracts}</td>
+      <td class="num green">${money(r.credit)}</td><td class="num red">${money(r.max_loss)}</td>
+      <td class="dim">${esc(r.expiry)}</td>
+      <td class="dim">${r.exit_plan?`tp ${money(r.exit_plan.profit_target_cost_to_close)} / sl ${money(r.exit_plan.stop_loss_cost_to_close)} / ${r.exit_plan.time_exit_dte}dte`:"—"}</td>
+    </tr>`).join("") + `</tbody></table>`;
+}
+
+function watch(rows){
+  if(!rows.length) return $("watch").innerHTML = empty("no WATCH items");
+  $("watch").innerHTML = `<table><thead><tr><th>SYM</th><th>STRUCTURE</th><th class="num">SCORE</th>
+    <th class="num">AGE</th><th>STATUS</th></tr></thead><tbody>`
+    + rows.map(w=>`<tr>
+      <td class="amber">${esc(w.symbol)}</td><td>${esc(w.structure)}</td>
+      <td class="num">${w.score==null?"—":w.score}</td>
+      <td class="num dim">${w.cycles_seen}/${w.expires_after_cycle}</td>
+      <td><span class="badge b-${esc(w.status)}">${esc(w.status)}</span></td>
+    </tr><tr><td></td><td colspan="4" class="dim" style="font-size:10px">
+      ${esc(w.resolution || w.promoting_condition || "")}</td></tr>`).join("") + `</tbody></table>`;
+}
+
+function chart(e){
+  const series = [
+    {name:"AGENT EQUITY (real broker)", color:"#22e06a", pts:e.equity_indexed.map(p=>p.pct)},
+    {name:`PASSIVE ${e.passive_symbol}`, color:"#35d6f5", pts:e.passive_indexed.map(p=>p.pct)},
+  ].filter(s=>s.pts.length>1);
+  if(!series.length) return $("equity").innerHTML = empty("not enough samples recorded yet — the curve builds as cycles run");
+  const W=1000,H=200,P=30;
+  const all = series.flatMap(s=>s.pts);
+  let lo=Math.min(...all,0), hi=Math.max(...all,0);
+  if(hi-lo<0.1){hi+=0.5;lo-=0.5;}
+  const x=(i,n)=>P+(W-2*P)*(n<2?0:i/(n-1));
+  const y=v=>H-P-(H-2*P)*((v-lo)/(hi-lo));
+  const paths = series.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="1.6"
+     points="${s.pts.map((v,i)=>`${x(i,s.pts.length).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}"/>`).join("");
+  const zero = (lo<=0&&hi>=0)?`<line x1="${P}" y1="${y(0)}" x2="${W-P}" y2="${y(0)}" stroke="#2a3a44" stroke-dasharray="3 3"/>`:"";
+  $("equity").innerHTML =
+    `<div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${s.name} ${s.pts.at(-1).toFixed(2)}%</span>`).join("")}</div>`
+    + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <rect x="0" y="0" width="${W}" height="${H}" fill="#0a1015"/>${zero}${paths}
+        <text x="4" y="12" fill="#5d7181" font-size="10">${hi.toFixed(2)}%</text>
+        <text x="4" y="${H-4}" fill="#5d7181" font-size="10">${lo.toFixed(2)}%</text>
+      </svg>`;
+}
+
+function cards(rows){
+  if(!rows.length) return $("cards").innerHTML = empty("no decisions recorded yet");
+  $("cards").innerHTML = rows.map(d=>{
+    const checks = (d.detail && d.detail.checks) ? `<div class="checks">` + d.detail.checks.map(c=>
+      `<div class="chk"><span class="st ${c.passed?'ok':'no'}">${c.passed?'PASS':'FAIL'}</span>
+       <span>#${c.id} ${esc(c.name)}${c.hard_gate?' <span class="gate">[GATE]</span>':''}
+       <span class="dim">— ${esc(c.measured)}</span></span></div>`).join("") + `</div>` : "";
+    return `<div class="card s-${esc(d.state)}">
+      <div class="meta">${esc(stamp(d.ts))} · cycle ${esc(d.cycle_id||"—")} ·
+        <span class="badge b-${esc(d.state)}">${esc(d.state)}</span>
+        ${d.score!=null?` · score ${d.score}/100`:""}</div>${esc(d.card||d.reason)}${checks}</div>`;
+  }).join("");
+}
+
+function monitor(m){
+  const L=m.ledger, O=m.outcomes, B=m.baselines;
+  // Header P&L is LIVE only. Simulated notional gets its own chip so a dry run
+  // can never be mistaken for realized money.
+  $("c-pnl").textContent = money(O.realized_pnl);
+  $("c-pnl").className = O.realized_pnl>0?"green":O.realized_pnl<0?"red":"";
+  const simOn = (O.dry_run_open||0)+(O.dry_run_closed||0) > 0;
+  $("c-sim").hidden = !simOn;
+  if(simOn){
+    $("c-simv").textContent = `${money(O.dry_run_notional_pnl)} notional · `
+      + `${O.dry_run_open} open / ${O.dry_run_closed} closed`;
+    $("c-simv").className = "violet";
+  }
+  const rows = o => Object.entries(o||{}).map(([k,v])=>`<div>${esc(k)}</div><div>${esc(v)}</div>`).join("");
+  $("monitor").innerHTML = `
+   <div class="amber" style="letter-spacing:.1em">DECISIONS ISSUED</div>
+   <div class="kv">${rows(L.decisions_by_state)||'<div class="dim">none</div><div></div>'}</div>
+   <div class="amber" style="margin-top:10px;letter-spacing:.1em">SCANNED BY UNDERLYING</div>
+   <div class="kv">${rows(L.opportunities_by_underlying)||'<div class="dim">none</div><div></div>'}</div>
+   <div class="amber" style="margin-top:10px;letter-spacing:.1em">TOP REJECTION REASONS</div>
+   <div class="kv">${(L.rejection_reasons||[]).slice(0,6).map(r=>
+      `<div>${r.count}</div><div>${esc(r.reason)}</div>`).join("")||'<div class="dim">none</div><div></div>'}</div>
+   <div class="amber" style="margin-top:10px;letter-spacing:.1em">MOST-FAILED CHECKS</div>
+   <div class="kv">${(L.failed_checks||[]).slice(0,8).map(c=>
+      `<div>${c.count}</div><div>${esc(c.check)}</div>`).join("")||'<div class="dim">none</div><div></div>'}</div>
+   <div class="amber" style="margin-top:10px;letter-spacing:.1em">OUTCOMES</div>
+   <div class="kv">
+     <div>realized p&amp;l <span class="dim">(live)</span></div><div>${money(O.realized_pnl)} <span class="dim">(n=${O.closed_positions.length})</span></div>
+     <div class="violet">simulated notional</div><div class="violet">${money(O.dry_run_notional_pnl)} <span class="dim">(${O.dry_run_open} open / ${O.dry_run_closed} closed — excluded from P&amp;L)</span></div>
+     <div>avg score executed</div><div>${O.avg_score_executed??"—"} <span class="dim">(n=${O.n_executed})</span></div>
+     <div>avg score declined</div><div>${O.avg_score_declined??"—"} <span class="dim">(n=${O.n_declined})</span></div>
+     ${rows(O.exits_by_reason)}
+   </div>
+   <div class="amber" style="margin-top:10px;letter-spacing:.1em">BASELINES (§8.3)</div>
+   <div class="kv">
+     <div>unfiltered setups</div><div>${B.unfiltered_setups}</div>
+     <div>unfiltered notional</div><div>${money(B.unfiltered_notional_credit)}</div>
+     <div>passive ${esc(B.passive_symbol)}</div><div>${B.passive_return_pct==null?"—":B.passive_return_pct+"%"}</div>
+   </div>`;
+}
+
+async function refresh(){
+  try{
+    const s = await (await fetch("/api/state")).json();
+    const cfg = s.config;
+    const mode = $("c-mode");
+    mode.className = "chip " + (cfg.dry_run?"dry":"live");
+    mode.innerHTML = "MODE <b>"+(cfg.dry_run?"DRY_RUN":"LIVE")+"</b>";
+    const eq = s.equity.equity;
+    $("c-eq").textContent = eq.length?money(eq.at(-1).equity):"—";
+    $("c-cycle").textContent = s.pipeline.cycle_id||"—";
+    $("c-upd").textContent = new Date().toLocaleTimeString("en-US",{timeZone:ET,hour12:false});
+    pipeline(s.pipeline); regimes(s.regimes); mcp(s.mcp);
+    positions(s.positions); watch(s.watch); chart(s.equity);
+    cards(s.decisions); monitor(s.monitoring);
+  }catch(e){ $("c-upd").textContent = "fetch error"; }
+}
+let auto=true, timer=null;
+function loop(){ if(timer)clearInterval(timer); if(auto) timer=setInterval(refresh,5000); }
+$("btn-auto").onclick = ()=>{ auto=!auto; $("btn-auto").classList.toggle("on",auto); loop(); };
+refresh(); loop();
+</script>
+</body>
+</html>
