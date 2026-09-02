@@ -76,7 +76,21 @@ the store.
   instruction priced against quotes the agent can no longer see. Its status is
   re-read from the broker immediately before the cancel, so a fill landing in
   that gap is never cancelled out from under its position, and the outcome is
-  read back rather than assumed. Exits are deliberately untouched — a working
+  read back rather than assumed.
+
+  **The cancel follows the re-quote chain.** Every re-quote *replaces* the
+  order: Alpaca settles the previous one as `replaced`, points its `replaced_by`
+  at the new order, and gives that replacement its own client_order_id. So
+  `get_order_by_client_id` keeps answering with the original, and cancelling
+  that id is refused with 422 `order is already in "replaced" state` — the
+  ladder's own price improvement made the entry uncancellable. `replaced_by` is
+  walked to the live tip before cancelling; a 422 naming the replaced state
+  (a re-quote landing between the status read and the cancel) is recovered by
+  walking again and cancelling the new tip. If a hop cannot be read, the live
+  order is recovered from the broker's open orders by lineage. If it still
+  cannot be resolved, nothing is cancelled and the failure is logged as an
+  ERROR demanding manual review — never swallowed, because a silent failure
+  here leaves a live order resting at the broker. Exits are deliberately untouched — a working
   exit is trying to close risk. The position row behind a cancelled entry is
   retired as `ENTRY_CANCELLED` with no realized P&L: nothing was ever held.
 

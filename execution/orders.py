@@ -25,6 +25,7 @@ import bootstrap  # noqa: F401  - must precede `logging.*` submodule imports
 
 import asyncio
 import hashlib
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -50,6 +51,29 @@ CLOSE_INTENT = "close"
 _NOOP_REQUOTE_MARKERS = ("order parameters are not changed",
                          "parameters are not changed",
                          "order is not changed")
+
+
+#: Alpaca refuses an action on an order that has already settled with
+#: 422 `order is already in "<state>" state`. "replaced" is the one that matters
+#: to the cancel sweep: it means a live replacement exists and holds the risk.
+_ALREADY_IN_STATE = re.compile(r'already\s+in\s+\\?"?(?P<state>[a-z_]+)\\?"?\s+state',
+                               re.IGNORECASE)
+
+#: How far a replacement chain is followed before it is called unresolvable.
+#: The ladder replaces once per step, so a chain is at most
+#: `requote_attempts` deep; the margin is for a manually replaced order.
+MAX_REPLACEMENT_HOPS = 12
+
+
+def already_in_state(error: BaseException | str) -> str | None:
+    """
+    The settled state Alpaca names when it refuses to act on an order.
+
+    Returns e.g. "replaced", "canceled" or "filled", or None when the error is
+    something else entirely.
+    """
+    match = _ALREADY_IN_STATE.search(str(error))
+    return match.group("state").lower() if match else None
 
 
 def is_noop_requote(error: BaseException | str) -> bool:
@@ -909,21 +933,36 @@ class Executor:
         for order in self.store.orders_today():
             if order.get("dry_run") or order.get("intent") != OPEN_INTENT:
                 continue
-            if str(order.get("status") or "").lower() not in WORKING_ORDER_STATUSES:
+            local_status = str(order.get("status") or "")
+            # An untrusted local status (UNKNOWN/FAILED/SUBMITTING) is not a
+            # settled order — it means the last read did not land. Those rows are
+            # candidates too, and the broker decides below. Skipping them is how
+            # a working order gets left resting: a failed status read during the
+            # re-quote ladder writes "unknown", which is not a settled state.
+            if (local_status.lower() not in WORKING_ORDER_STATUSES
+                    and local_status.upper() not in UNTRUSTED_LOCAL_STATUSES):
                 continue
 
             coid = order["client_order_id"]
             symbol = order.get("symbol")
-            status = str(order.get("status") or "").lower()
+            status = local_status.lower()
             broker_id = order.get("broker_order_id")
 
             confirmed = await self._broker_order(coid)
             if confirmed is not None:
-                status = str(pick(confirmed, "status", default=status) or "").lower()
-                broker_id = pick(confirmed, "id", "order_id") or broker_id
+                # A re-quoted order answers this lookup with the ORIGINAL, now
+                # settled as "replaced": the replacement carries its own
+                # client_order_id. Follow the chain to whatever is actually live.
+                live, chain = await self._live_replacement(confirmed, coid, symbol)
+                if live is None:
+                    continue  # unresolvable; _live_replacement has logged it
+                status = str(pick(live, "status", default=status) or "").lower()
+                broker_id = pick(live, "id", "order_id") or broker_id
                 self.store.update_order(coid, status=status,
-                                        broker_order_id=broker_id, response=confirmed)
-            if status not in WORKING_ORDER_STATUSES:
+                                        broker_order_id=broker_id, response=live)
+            else:
+                chain = []
+            if status not in WORKING_ORDER_STATUSES or status == "replaced":
                 continue  # filled, already cancelled, or otherwise settled
 
             if not broker_id:
@@ -934,21 +973,17 @@ class Executor:
                 )
                 continue
 
-            try:
-                await self.mcp.call("cancel_order_by_id", {"order_id": str(broker_id)})
-            except MCPError as exc:
-                self.events.error(
-                    f"Could not cancel unfilled entry {coid} for {symbol}: {exc}",
-                    symbol=symbol,
-                    payload={"client_order_id": coid, "order_id": str(broker_id)},
-                )
-                continue
+            broker_id = await self._cancel_following_replacements(
+                str(broker_id), coid, symbol)
+            if broker_id is None:
+                continue  # refused and unresolvable; already logged as an error
 
             # Alpaca answers a cancel with an empty body, so the outcome is read
             # back rather than assumed: the cancel can still lose a race with a
             # fill, and recording "canceled" for a filled order would abandon a
-            # live position.
-            after = await self._broker_order(coid)
+            # live position. Read the order that was actually cancelled — the
+            # tip of the chain, not the replaced ancestor the coid resolves to.
+            after = await self._broker_order_by_id(broker_id)
             final = (str(pick(after, "status", default="pending_cancel") or "").lower()
                      if after is not None else "pending_cancel")
             filled_qty = to_float(pick(after, "filled_qty"), 0.0) if after else 0.0
@@ -958,6 +993,8 @@ class Executor:
             record = {"client_order_id": coid, "symbol": symbol,
                       "order_id": str(broker_id), "status": final,
                       "filled_qty": filled_qty, "position_closed": False}
+            if chain:
+                record["replacement_chain"] = chain
 
             if final == "filled" or (filled_qty or 0) > 0:
                 # It filled first. Leave the position row alone; reconciliation
@@ -977,8 +1014,11 @@ class Executor:
                 Stage.EXECUTION,
                 f"ENTRY CANCELLED — {symbol} entry {coid} was still working at the "
                 f"end of the cycle that placed it and never filled; cancelled "
-                f"(broker status {final}) so the next cycle re-prices against "
-                "fresh quotes",
+                f"order {broker_id}"
+                + (f" (the tip of a {len(chain)}-replacement re-quote chain)"
+                   if chain else "")
+                + f" with broker status {final}, so the next cycle re-prices "
+                "against fresh quotes",
                 symbol=symbol, payload={"cancelled": "UNFILLED_ENTRY", **record},
             )
             cancelled.append(record)
@@ -1001,6 +1041,199 @@ class Executor:
             return None
         obj = as_obj(raw)
         return obj if isinstance(obj, dict) else None
+
+    async def _broker_order_by_id(self, order_id: str) -> dict | None:
+        """Current broker record for a broker order id, or None if unreadable."""
+        try:
+            raw = await self.mcp.call("get_order_by_id", {"order_id": str(order_id)})
+        except MCPError:
+            return None
+        obj = as_obj(raw)
+        return obj if isinstance(obj, dict) else None
+
+    # -- replacement chains ------------------------------------------------
+    async def _live_replacement(self, order: dict, coid: str,
+                                symbol: str | None) -> tuple[dict | None, list[str]]:
+        """
+        Walk `replaced_by` to the order that is actually live.
+
+        Every re-quote replaces the order: Alpaca settles the previous one as
+        "replaced", points its `replaced_by` at the new order, and gives that
+        replacement its own client_order_id. So `get_order_by_client_id` keeps
+        answering with the ORIGINAL, and cancelling that id is refused with 422
+        `order is already in "replaced" state`. Only the tip of the chain holds
+        the risk, and only the tip can be cancelled.
+
+        Returns (live order, the chain of ids walked to reach it). The live order
+        is None when the chain cannot be resolved — never silently the ancestor,
+        because cancelling an ancestor does nothing while a live order rests at
+        the broker.
+        """
+        chain: list[str] = []
+        current = order
+        #: Orders read and confirmed settled — every one of these has been
+        #: superseded, so none of them can be the live order.
+        ancestors = {str(pick(current, "id", "order_id") or "")}
+        #: Ids reached but not necessarily read. Kept apart from `ancestors`: an
+        #: id whose read FAILED may well be the live tip, and must stay eligible
+        #: for the open-orders fallback below.
+        attempted: set[str] = set()
+
+        for _ in range(MAX_REPLACEMENT_HOPS):
+            successor = pick(current, "replaced_by")
+            if not successor:
+                return current, chain
+            successor = str(successor)
+            if successor in attempted or successor in ancestors:
+                break  # a cycle; fall through to the open-orders lookup
+            attempted.add(successor)
+            chain.append(successor)
+            nxt = await self._broker_order_by_id(successor)
+            if nxt is not None:
+                ancestors.add(successor)
+            if nxt is None:
+                self.events.error(
+                    f"Replacement {successor} of entry {coid} could not be read "
+                    f"from the broker while following the re-quote chain",
+                    symbol=symbol,
+                    payload={"client_order_id": coid, "chain": chain},
+                )
+                break
+            current = nxt
+        else:
+            self.events.error(
+                f"Replacement chain for entry {coid} exceeded "
+                f"{MAX_REPLACEMENT_HOPS} hops",
+                symbol=symbol, payload={"client_order_id": coid, "chain": chain},
+            )
+
+        # The chain broke. Fall back to the lineage in the broker's own open
+        # orders before giving up.
+        recovered = await self._replacement_from_open_orders(
+            ancestors, ancestors | attempted, coid)
+        if recovered is not None:
+            recovered_id = str(pick(recovered, "id", "order_id") or "")
+            chain.append(recovered_id)
+            self.events.emit(
+                Stage.EXECUTION,
+                f"Re-quote chain for entry {coid} was followed to open order "
+                f"{recovered_id} by lineage after `replaced_by` ran out",
+                symbol=symbol,
+                payload={"client_order_id": coid, "chain": chain,
+                         "resolved_by": "open-orders lineage"},
+            )
+            return recovered, chain
+
+        self.events.error(
+            f"Entry {coid} for {symbol} is replaced but its replacement could not "
+            f"be resolved (chain {chain or 'empty'}); it was NOT cancelled and may "
+            "still be working at the broker — MANUAL REVIEW REQUIRED",
+            symbol=symbol,
+            payload={"client_order_id": coid, "chain": chain,
+                     "unresolved": "REPLACEMENT_CHAIN"},
+        )
+        return None, chain
+
+    async def _replacement_from_open_orders(self, ancestors: set[str],
+                                            lineage: set[str],
+                                            coid: str) -> dict | None:
+        """
+        Find the live replacement among the broker's open orders.
+
+        The fallback when a `replaced_by` hop is missing or unreadable: an open
+        order that `replaces` an id in this lineage belongs to it, as does one
+        still carrying the original client_order_id.
+
+        `ancestors` are the orders read and confirmed superseded — they can
+        never be the answer. `lineage` also includes ids that were reached but
+        could not be read, which is the usual reason to be here: the unread id
+        may be exactly the live order this returns.
+        """
+        try:
+            raw = await self.mcp.call(
+                "get_orders",
+                {"status": "open", "limit": 200, "nested": True, "direction": "desc"},
+            )
+        except MCPError:
+            return None
+        for candidate in iter_records(raw):
+            candidate_id = str(pick(candidate, "id", "order_id") or "")
+            if not candidate_id or candidate_id in ancestors:
+                continue
+            if candidate_id in lineage:
+                return candidate
+            if str(pick(candidate, "replaces") or "") in lineage:
+                return candidate
+            if pick(candidate, "client_order_id") == coid:
+                return candidate
+        return None
+
+    async def _cancel_following_replacements(self, order_id: str, coid: str,
+                                             symbol: str | None) -> str | None:
+        """
+        Cancel an order, chasing the replacement chain if the broker refuses.
+
+        The status read and the cancel are two round trips, so a re-quote can
+        land between them and the id we hold goes stale exactly as it does on a
+        stale local record. A 422 naming the "replaced" state is that race, and
+        it is recoverable: resolve the chain again and cancel the new tip.
+        Returns the id actually cancelled, or None if it could not be.
+        """
+        current = order_id
+        for attempt in range(2):
+            try:
+                await self.mcp.call("cancel_order_by_id", {"order_id": current})
+                return current
+            except MCPError as exc:
+                state = already_in_state(exc)
+                if state == "replaced" and attempt == 0:
+                    self.events.emit(
+                        Stage.EXECUTION,
+                        f"Cancel of {current} for entry {coid} was refused — the "
+                        f"order was replaced by a re-quote after its status was "
+                        f"read; following the chain to the live replacement",
+                        symbol=symbol,
+                        payload={"client_order_id": coid, "order_id": current,
+                                 "broker_state": state},
+                    )
+                    settled = await self._broker_order_by_id(current)
+                    if settled is None:
+                        break
+                    live, _ = await self._live_replacement(settled, coid, symbol)
+                    if live is None:
+                        return None  # already logged as unresolvable
+                    current = str(pick(live, "id", "order_id") or "")
+                    if not current:
+                        break
+                    continue
+                if state in {"canceled", "cancelled", "filled", "expired", "rejected"}:
+                    # Settled between the read and the cancel. Nothing to do,
+                    # and nothing wrong: the read-back records what it became.
+                    self.events.emit(
+                        Stage.EXECUTION,
+                        f"Cancel of {current} for entry {coid} was unnecessary — "
+                        f"the broker reports it already {state}",
+                        symbol=symbol,
+                        payload={"client_order_id": coid, "order_id": current,
+                                 "broker_state": state},
+                    )
+                    return current
+                self.events.error(
+                    f"Could not cancel unfilled entry {coid} for {symbol}: {exc}",
+                    symbol=symbol,
+                    payload={"client_order_id": coid, "order_id": current},
+                )
+                return None
+
+        self.events.error(
+            f"Entry {coid} for {symbol} was refused cancellation as replaced, and "
+            f"the live replacement could not be reached; it may still be working "
+            "at the broker — MANUAL REVIEW REQUIRED",
+            symbol=symbol,
+            payload={"client_order_id": coid, "order_id": current,
+                     "unresolved": "CANCEL_AFTER_REPLACE"},
+        )
+        return None
 
     def _retire_unfilled_position(self, coid: str, symbol: str | None,
                                   status: str) -> bool:

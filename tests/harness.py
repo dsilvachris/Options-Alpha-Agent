@@ -1474,19 +1474,35 @@ class RestingEntryMCP:
     filled), while `get_orders` keeps returning the working order until it is
     cancelled — the two readings reconciliation has to combine.
 
-    `fill_on_confirm` makes the order fill at the moment the sweep re-reads its
-    status, which is the race the sweep must not lose.
+    It also models Alpaca's replacement semantics, which is what breaks a naive
+    cancel: replacing an order settles it as "replaced" and issues a NEW order
+    with its own client_order_id, so `get_order_by_client_id` keeps answering
+    with the original and cancelling that id is refused 422.
+
+    Flags:
+      fill_on_confirm  the order fills exactly when the sweep re-reads it — the
+                       race the sweep must not lose.
+      orders_readable  `get_orders` fails, so reconciliation is blind.
+      unreadable_ids   `get_order_by_id` fails for these broker ids, breaking
+                       the chain walk at a chosen hop.
     """
 
     def __init__(self, legs: list[dict], qty: int, limit_price: str,
-                 fill_on_confirm: bool = False, orders_readable: bool = True) -> None:
+                 fill_on_confirm: bool = False, orders_readable: bool = True,
+                 unreadable_ids: tuple[str, ...] = (),
+                 replace_on_cancel: int = 0) -> None:
         self.legs = legs
         self.qty = qty
         self.limit_price = limit_price
         self.fill_on_confirm = fill_on_confirm
         self.orders_readable = orders_readable
-        self.orders: dict[str, dict] = {}
+        self.unreadable_ids = set(unreadable_ids)
+        #: how many times a cancel is beaten by a re-quote landing first
+        self.replace_on_cancel = replace_on_cancel
+        #: every order ever created, by broker id, oldest first
+        self.book: dict[str, dict] = {}
         self.cancels: list[str] = []
+        self.refused_cancels: list[str] = []
         self.status_reads = 0
         self._seq = 0
 
@@ -1494,56 +1510,121 @@ class RestingEntryMCP:
     def require(self, *t): pass
     def tool_names(self): return []
 
-    def _order(self, coid: str, status: str) -> dict:
-        return {
+    # -- book keeping ------------------------------------------------------
+    def _new_order(self, coid: str, limit_price: str, replaces: str | None) -> dict:
+        self._seq += 1
+        order = {
             "id": f"sim-broker-{self._seq}", "client_order_id": coid,
-            "status": status, "qty": str(self.qty),
-            "filled_qty": str(self.qty) if status == "filled" else "0",
-            "limit_price": self.limit_price, "order_class": "mleg",
+            "status": "new", "qty": str(self.qty), "filled_qty": "0",
+            "limit_price": limit_price, "order_class": "mleg",
+            "replaces": replaces, "replaced_by": None,
             "legs": [dict(l) for l in self.legs],
         }
+        self.book[order["id"]] = order
+        return order
+
+    @property
+    def orders(self) -> dict[str, dict]:
+        """The book keyed by client_order_id, newest wins (legacy accessor)."""
+        return {o["client_order_id"]: o for o in self.book.values()}
+
+    def _by_coid(self, coid: str) -> dict | None:
+        """
+        The order the ORIGINAL client_order_id resolves to.
+
+        Alpaca answers with the order that carries the id — after a replacement
+        that is the settled ancestor, not the live replacement.
+        """
+        return next((o for o in self.book.values()
+                     if o["client_order_id"] == coid), None)
+
+    def tip(self) -> dict | None:
+        """The live end of the replacement chain."""
+        return next((o for o in self.book.values()
+                     if o["status"] in ("new", "accepted", "partially_filled")), None)
 
     async def call(self, tool: str, arguments: dict | None = None) -> Any:
         args = arguments or {}
         if tool == "place_option_order":
-            self._seq += 1
-            coid = args["client_order_id"]
-            self.orders[coid] = self._order(coid, "new")
-            return self.orders[coid]
+            return self._new_order(args["client_order_id"], self.limit_price, None)
+
+        if tool == "replace_order_by_id":
+            previous = self.book.get(str(args.get("order_id")))
+            if previous is None or previous["status"] != "new":
+                raise MCPError(
+                    'HTTP error 422: {"message": "order is already in '
+                    f'\\"{previous["status"] if previous else "unknown"}\\" state"}}')
+            # The replacement carries its OWN client_order_id, as Alpaca's does.
+            replacement = self._new_order(
+                f"auto-{self._seq + 1}", str(args.get("limit_price")), previous["id"])
+            previous["status"] = "replaced"
+            previous["replaced_by"] = replacement["id"]
+            return replacement
+
         if tool == "get_order_by_client_id":
-            coid = args.get("client_order_id")
-            if coid not in self.orders:
+            order = self._by_coid(args.get("client_order_id"))
+            if order is None:
                 raise MCPError("order not found")
             self.status_reads += 1
-            if self.fill_on_confirm and self.orders[coid]["status"] == "new":
-                self.orders[coid] = self._order(coid, "filled")
-            return self.orders[coid]
+            if self.fill_on_confirm:
+                # The fill lands on whatever is live — after a re-quote that is
+                # the tip of the chain, not the order this id names.
+                live = self.tip()
+                if live is not None:
+                    live["status"] = "filled"
+                    live["filled_qty"] = str(self.qty)
+            return order
+
         if tool == "get_order_by_id":
-            return next((o for o in self.orders.values()
-                         if o["id"] == args.get("order_id")), {"status": "new"})
+            order = self.book.get(str(args.get("order_id")))
+            if order is None:
+                raise MCPError("order not found")
+            if str(args.get("order_id")) in self.unreadable_ids:
+                raise MCPError("HTTP error 500: order unavailable")
+            return order
+
         if tool == "get_orders":
             if not self.orders_readable:
                 raise MCPError("HTTP error 500: orders unavailable")
-            wanted = args.get("status", "open")
-            out = list(self.orders.values())
-            if wanted == "open":
-                out = [o for o in out if o["status"] in ("new", "accepted",
-                                                         "partially_filled")]
+            out = list(self.book.values())
+            if args.get("status", "open") == "open":
+                out = [o for o in out
+                       if o["status"] in ("new", "accepted", "partially_filled")]
             return {"orders": out}
+
         if tool == "cancel_order_by_id":
-            self.cancels.append(str(args.get("order_id")))
-            for coid, order in self.orders.items():
-                if order["id"] == str(args.get("order_id")) and order["status"] != "filled":
-                    self.orders[coid] = self._order(coid, "canceled")
+            target = str(args.get("order_id"))
+            order = self.book.get(target)
+            if (self.replace_on_cancel > 0 and order is not None
+                    and order["status"] == "new"):
+                # A re-quote lands in the gap between the status read and the
+                # cancel: the id the caller holds settles as replaced.
+                self.replace_on_cancel -= 1
+                replacement = self._new_order(
+                    f"auto-{self._seq + 1}", "-0.70", order["id"])
+                order["status"] = "replaced"
+                order["replaced_by"] = replacement["id"]
+            order = self.book.get(target)
+            if order is not None and order["status"] not in ("new", "accepted",
+                                                             "partially_filled"):
+                # Exactly what Alpaca answers for a replaced ancestor.
+                self.refused_cancels.append(target)
+                raise MCPError(
+                    'HTTP error 422: {"message": "order is already in '
+                    f'\\"{order["status"]}\\" state"}}')
+            self.cancels.append(target)
+            if order is not None:
+                order["status"] = "canceled"
             return {}
+
         if tool == "get_all_positions":
-            # Nothing ever filled, so the broker holds no legs.
-            return [] if not any(o["status"] == "filled" for o in self.orders.values()) \
-                else [{"symbol": l["symbol"],
-                       "qty": str(self.qty * (-1 if l["side"] == "sell" else 1)),
-                       "side": "short" if l["side"] == "sell" else "long",
-                       "avg_entry_price": "1.00", "asset_class": "us_option"}
-                      for l in self.legs]
+            if not any(o["status"] == "filled" for o in self.book.values()):
+                return []
+            return [{"symbol": l["symbol"],
+                     "qty": str(self.qty * (-1 if l["side"] == "sell" else 1)),
+                     "side": "short" if l["side"] == "sell" else "long",
+                     "avg_entry_price": "1.00", "asset_class": "us_option"}
+                    for l in self.legs]
         return {}
 
 
@@ -1604,12 +1685,23 @@ async def scenario_11_unfilled_entry() -> Outcome:
         print(f"  {'OK ' if seq_now == 0 else 'BAD'} entry sequence still #{seq_now} "
               f"— a second position in {st.symbol} cannot be opened")
 
-        sub("11c. End-of-cycle sweep cancels the unfilled entry")
+        sub("11c. End-of-cycle sweep cancels the unfilled entry — through its "
+            "re-quote chain")
+        tip = sim.tip()
+        print(f"  the ladder replaced this order {len(sim.book) - 1} time(s):")
+        for oid, o in sim.book.items():
+            print(f"      {oid:<16} coid {o['client_order_id']:<26} "
+                  f"{o['status']:<9} replaced_by={o['replaced_by'] or '—'}")
+        print(f"  get_order_by_client_id({coid[:18]}…) still answers with "
+              f"{sim._by_coid(coid)['id']} ({sim._by_coid(coid)['status']}) — "
+              f"cancelling THAT is the 422")
+        print(f"  the live order is {tip['id']}\n")
         cancelled = await executor.cancel_unfilled_entries()
         after_row = store.get_order(coid)
         position_rows = store.query(
             "SELECT * FROM positions WHERE entry_order_id=?", (coid,))
         print(f"  cancel_order_by_id calls : {sim.cancels}")
+        print(f"  refused as replaced      : {sim.refused_cancels or 'none'}")
         print(f"  order status now         : {after_row['status']}")
         print(f"  position row             : {position_rows[0]['status']} / "
               f"{position_rows[0]['exit_reason']}")
@@ -1617,7 +1709,12 @@ async def scenario_11_unfilled_entry() -> Outcome:
               f"({DIM}NULL — nothing was ever held{RESET})")
         checks = {
             "exactly one cancel was sent": len(sim.cancels) == 1,
-            "it cancelled the entry's broker order": sim.cancels == ["sim-broker-1"],
+            "it cancelled the LIVE tip of the re-quote chain":
+                sim.cancels == [tip["id"]],
+            "it did not cancel the replaced original":
+                "sim-broker-1" not in sim.cancels,
+            "the broker never refused a cancel as replaced":
+                sim.refused_cancels == [],
             "the sweep reported it": len(cancelled) == 1,
             "the local order reads canceled":
                 str(after_row["status"]).lower() == "canceled",
@@ -1714,11 +1811,93 @@ async def scenario_11_unfilled_entry() -> Outcome:
               f"it is closed as {orphan['exit_reason']}")
         print(f"      {DIM}the guard narrows the close-missing rule, it does not "
               f"disable it{RESET}")
+        async def replaced_chain_case(tag: str, **sim_kw):
+            """Place an entry, let the ladder replace it, then sweep."""
+            case_store = test_store(tag)
+            case_events = EventLog.start(case_store)
+            case_risk = risk_rules.evaluate(
+                structure=st, equity=100_000.0, open_positions=0,
+                same_direction_positions=0, proposed_bias=1, corporate_actions=[],
+                store=case_store, events=case_events, today=date(2026, 9, 1))
+            case_sim = RestingEntryMCP([l.to_mcp_leg() for l in st.legs],
+                                       case_risk.contracts, "-0.80", **sim_kw)
+            case_exec = Executor(case_sim, None, case_store, case_events)
+            case_exec.set_market_open(True)
+            await case_exec.open_structure(st, case_risk, today=today_et())
+            swept = await case_exec.cancel_unfilled_entries()
+            errors = case_store.query(
+                "SELECT * FROM events WHERE cycle_id=? AND stage='ERROR'",
+                (case_events.cycle_id,))
+            return case_store, case_sim, swept, errors
+
+        sub("11i. A re-quote landing between the status read and the cancel")
+        print(f"  {DIM}the sweep reads the status, then a ladder step replaces the "
+              f"order, then{RESET}")
+        print(f"  {DIM}the cancel arrives at an id the broker now calls "
+              f"\"replaced\".{RESET}")
+        race_store2, sim2, swept2, errors2 = await replaced_chain_case(
+            "requote_race", replace_on_cancel=1)
+        print(f"  refused as replaced : {sim2.refused_cancels}")
+        print(f"  cancelled after     : {sim2.cancels}")
+        cancelled_row = race_store2.query(
+            "SELECT * FROM positions WHERE status='CLOSED'")
+        checks = {
+            "the broker refused the first cancel as replaced":
+                len(sim2.refused_cancels) == 1,
+            "the sweep followed the chain and cancelled the new tip":
+                len(sim2.cancels) == 1 and sim2.cancels[0] not in sim2.refused_cancels,
+            "the order it finally cancelled is the live one":
+                sim2.book[sim2.cancels[0]]["status"] == "canceled",
+            "the sweep reported the cancel": len(swept2) == 1,
+            "the position row was retired": len(cancelled_row) == 1,
+            "nothing was logged as an error": not errors2,
+        }
+        for label, ok in checks.items():
+            results.append(ok)
+            print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+        sub("11j. A broken replaced_by hop is recovered from the open orders")
+        _, sim3, swept3, errors3 = await replaced_chain_case(
+            "chain_gap", unreadable_ids=("sim-broker-4",))
+        print(f"  sim-broker-4 (the tip) cannot be read by id; the lineage is "
+              f"recovered from get_orders")
+        print(f"  cancelled           : {sim3.cancels}")
+        checks = {
+            "the tip was still found and cancelled": sim3.cancels == ["sim-broker-4"],
+            "the sweep reported it": len(swept3) == 1,
+            "the recovery was not silent — the chain is on the record":
+                bool(swept3 and swept3[0].get("replacement_chain")),
+        }
+        for label, ok in checks.items():
+            results.append(ok)
+            print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+        sub("11k. An unresolvable chain is logged loudly, never swallowed")
+        gap_store, sim4, swept4, errors4 = await replaced_chain_case(
+            "chain_lost", unreadable_ids=("sim-broker-2", "sim-broker-3",
+                                          "sim-broker-4"),
+            orders_readable=False)
+        open_rows = gap_store.open_positions()
+        print(f"  cancelled           : {sim4.cancels or 'nothing'}")
+        for row in errors4:
+            print(f"  {DIM}ERROR event:{RESET} {row['message'][:96]}")
+        checks = {
+            "no cancel was sent blindly": sim4.cancels == [],
+            "the sweep claimed nothing": swept4 == [],
+            "it was logged as an error": bool(errors4),
+            "the error demands manual review":
+                any("MANUAL REVIEW REQUIRED" in r["message"] for r in errors4),
+            "the position row is left OPEN for reconciliation to manage":
+                len(open_rows) == 1,
+        }
+        for label, ok in checks.items():
+            results.append(ok)
+            print(f"  {'OK ' if ok else 'BAD'} {label}")
     finally:
         object.__setattr__(ENV, "dry_run", was_dry)
         object.__setattr__(EXECUTION, "requote_wait_seconds", was_wait)
 
-    sub("11i. Recorded event log")
+    sub("11l. Recorded event log")
     show_events(store, events.cycle_id,
                 (Stage.EXECUTION, Stage.POSITION_MANAGEMENT, Stage.ERROR))
 
