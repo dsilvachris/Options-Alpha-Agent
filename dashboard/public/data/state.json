@@ -1,8 +1,8 @@
 {
  "meta": {
-  "generated_at": "2026-09-02T08:03:39.539414-04:00",
-  "generated_at_display": "08:03 EDT",
-  "generated_at_utc": "2026-09-02T12:03:39.539446+00:00",
+  "generated_at": "2026-09-02T08:13:01.951634-04:00",
+  "generated_at_display": "08:13 EDT",
+  "generated_at_utc": "2026-09-02T12:13:01.951662+00:00",
   "timezone": "America/New_York",
   "market_open": false,
   "mode": "static",
@@ -56,7 +56,7 @@
   "base_url": "https://paper-api.alpaca.markets/v2"
  },
  "pipeline": {
-  "cycle_id": "b6011ef72668",
+  "cycle_id": "b8284e45742e",
   "stages": [
    {
     "stage": "MARKET_SCAN",
@@ -106,14 +106,14 @@
   "complete": false,
   "other_events": [
    {
-    "id": 340,
-    "ts": "2026-09-02T12:02:28+00:00",
+    "id": 341,
+    "ts": "2026-09-02T12:03:39+00:00",
     "stage": "EXECUTION",
     "symbol": null,
     "message": "Published static dashboard snapshot (14 files, digest 0b9f14e113d5)",
     "payload": {
      "digest": "0b9f14e113d561a48833e4d0826122a0aa5d5a771df0a43a177e62cf01c19ff6",
-     "generated_at": "2026-09-02T08:02:28.827096-04:00",
+     "generated_at": "2026-09-02T08:03:39.539414-04:00",
      "files": [
       "state.json",
       "decisions.json",
@@ -131,10 +131,28 @@
       "vercel.json"
      ]
     }
+   },
+   {
+    "id": 342,
+    "ts": "2026-09-02T12:03:46+00:00",
+    "stage": "EXECUTION",
+    "symbol": null,
+    "message": "PUBLISH \u2014 committed (d71f2df)",
+    "payload": {
+     "committed": true,
+     "pushed": true,
+     "reason": "committed"
+    }
    }
   ]
  },
  "cycles": [
+  {
+   "cycle_id": "b8284e45742e",
+   "started": "2026-09-02T12:03:39+00:00",
+   "ended": "2026-09-02T12:03:46+00:00",
+   "events": 2
+  },
   {
    "cycle_id": "b6011ef72668",
    "started": "2026-09-02T12:02:28+00:00",
@@ -248,12 +266,6 @@
    "started": "2026-09-01T22:21:30+00:00",
    "ended": "2026-09-01T22:21:31+00:00",
    "events": 3
-  },
-  {
-   "cycle_id": "f47ddaa7710c",
-   "started": "2026-09-01T22:21:13+00:00",
-   "ended": "2026-09-01T22:21:13+00:00",
-   "events": 2
   }
  ],
  "positions": {
@@ -8758,6 +8770,7 @@
    "decisions_by_state": {},
    "rejection_reasons": [],
    "failed_checks": [],
+   "not_evaluable_checks": [],
    "watch_promotions": [],
    "total_decisions": 0,
    "session_only": true,
