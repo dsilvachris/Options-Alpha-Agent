@@ -141,7 +141,7 @@ class WatchRegistry:
         )
 
     # -- expiry sweep ------------------------------------------------------
-    def expire_stale(self) -> list[dict]:
+    def expire_stale(self, market_open: bool = True) -> list[dict]:
         """
         Close out WATCH items whose promoting condition was not met in the window.
 
@@ -177,6 +177,7 @@ class WatchRegistry:
                 cycle_id=self.events.cycle_id,
                 symbol=item["symbol"],
                 state=EXPIRED,
+                market_open=market_open,
                 score=int(item["score"] or 0),
                 structure=item["structure"],
                 iv_condition=detail.get("iv_condition"),

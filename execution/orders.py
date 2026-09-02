@@ -126,11 +126,36 @@ class Executor:
         market: MarketData,
         store: Store,
         events: EventLog,
+        market_open: bool | None = None,
     ) -> None:
         self.mcp = mcp
         self.market = market
         self.store = store
         self.events = events
+        #: Market session state for this cycle. False blocks ALL submission —
+        #: entries and exits alike. The risk gate already refuses entries out of
+        #: session, but exits bypass the risk gate entirely, so the block lives
+        #: here as well: a stop firing overnight off a stale mark must not queue
+        #: an order into a closed book.
+        #: None means "not supplied" and does not block; the agent sets it every
+        #: cycle from get_clock.
+        self.market_open = market_open
+
+    def set_market_open(self, market_open: bool | None) -> None:
+        self.market_open = market_open
+
+    def _blocked_by_session(self, what: str, symbol: str | None = None) -> bool:
+        """True when the market is known to be closed, logging the block."""
+        if self.market_open is not False:
+            return False
+        self.events.emit(
+            Stage.EXECUTION,
+            f"MARKET CLOSED — {what} not submitted; it would queue into a closed "
+            "book and fill at the next open at an unevaluated price",
+            symbol=symbol,
+            payload={"blocked": "MARKET_CLOSED", "what": what},
+        )
+        return True
 
     # -- helpers -----------------------------------------------------------
     @staticmethod
@@ -364,6 +389,11 @@ class Executor:
         sequence = entry_sequence(self.store, structural)
         pkey = f"{structural}#{sequence}"
         coid = client_order_id(pkey, OPEN_INTENT, today)
+
+        if self._blocked_by_session(
+                f"entry for {structure.symbol} {structure.structure}", structure.symbol):
+            return OrderResult(False, ENV.dry_run, coid, status="MARKET_CLOSED",
+                               error="market closed")
 
         if not risk.approved or risk.contracts < 1:
             self.events.emit(
@@ -628,13 +658,26 @@ class Executor:
         cost: float | None,
         *,
         today: date | None = None,
+        force: bool = False,
     ) -> OrderResult:
-        """Close a recorded position by submitting the reversing multi-leg order."""
+        """
+        Close a recorded position by submitting the reversing multi-leg order.
+
+        Blocked while the market is closed unless `force` is set. Automated exits
+        never force; the manual `flatten` command does, because that is a
+        deliberate operator action.
+        """
         import json
 
         today = today or today_et()
         pkey = position["position_key"]
         coid = client_order_id(pkey, CLOSE_INTENT, today)
+
+        if not force and self._blocked_by_session(
+                f"exit for {position['symbol']} {position['structure']} ({reason})",
+                position["symbol"]):
+            return OrderResult(False, ENV.dry_run, coid, status="MARKET_CLOSED",
+                               error="market closed")
 
         legs = position.get("legs")
         if isinstance(legs, str):
@@ -732,7 +775,8 @@ class Executor:
         results: list[dict] = []
         for position in self.store.open_positions():
             cost = await self.cost_to_close(position)
-            result = await self.close_structure(position, "end-of-window flatten", cost)
+            result = await self.close_structure(
+                position, "end-of-window flatten", cost, force=True)
             results.append(
                 {
                     "symbol": position["symbol"],

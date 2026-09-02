@@ -33,6 +33,8 @@ from logging.store import Store
 
 APPROVED = "APPROVED"
 REFUSED = "REFUSED"
+#: Refusal reason when the US market is closed.
+MARKET_CLOSED = "MARKET_CLOSED"
 
 
 @dataclass
@@ -148,6 +150,7 @@ def evaluate(
     store: Store,
     events: EventLog,
     today: date | None = None,
+    market_open: bool = True,
 ) -> RiskDecision:
     """
     The Risk Gate. Independently validates a proposed trade before order placement.
@@ -157,6 +160,16 @@ def evaluate(
     """
     today = today or today_et()
     reasons: list[str] = []
+
+    # -- market session ----------------------------------------------------
+    # No new position is opened out of hours. Out-of-session quotes are wide and
+    # stale, and Alpaca would queue the order to fill at the next open at a price
+    # nobody evaluated.
+    if not market_open:
+        reasons.append(
+            f"{MARKET_CLOSED}: the US market is closed; no new position is "
+            "opened out of session"
+        )
 
     # -- end-of-window deadline -------------------------------------------
     if past_hard_close():

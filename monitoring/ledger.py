@@ -27,6 +27,11 @@ class ActivityLedger:
     failed_checks: list[tuple[str, int]] = field(default_factory=list)
     watch_promotions: list[dict] = field(default_factory=list)
     total_decisions: int = 0
+    #: Section 4.4 context — out-of-session decisions are priced off wide
+    #: after-hours quotes and are counted, but not mixed into the totals above.
+    session_only: bool = True
+    out_of_session: int = 0
+    unrecorded_session: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -36,11 +41,19 @@ class ActivityLedger:
             "failed_checks": [{"check": c, "count": n} for c, n in self.failed_checks],
             "watch_promotions": self.watch_promotions,
             "total_decisions": self.total_decisions,
+            "session_only": self.session_only,
+            "out_of_session": self.out_of_session,
+            "unrecorded_session": self.unrecorded_session,
         }
 
     def render(self) -> str:
-        lines = ["ACTIVITY LEDGER (Section 8.1) — raw counts", ""]
+        scope = "in-session only" if self.session_only else "all sessions"
+        lines = [f"ACTIVITY LEDGER (Section 8.1) — raw counts, {scope}", ""]
         lines.append(f"Total decisions recorded: {self.total_decisions}")
+        if self.out_of_session or self.unrecorded_session:
+            lines.append(
+                f"Excluded: {self.out_of_session} out-of-session, "
+                f"{self.unrecorded_session} with no market state recorded")
         lines.append("")
         lines.append("Opportunities scanned, by underlying:")
         for symbol, count in sorted(self.opportunities_by_underlying.items()):
@@ -94,9 +107,16 @@ def _reason_bucket(reason: str) -> str:
     return text[:60] if text else "unspecified"
 
 
-def build(store: Store) -> ActivityLedger:
-    """Assemble the ledger from recorded decisions and watch items."""
-    decisions = store.all_decisions()
+def build(store: Store, session_only: bool = True) -> ActivityLedger:
+    """
+    Assemble the ledger from recorded decisions and watch items.
+
+    Defaults to in-session decisions only. Out-of-session candidates are priced
+    off wide after-hours quotes, so their rejection reasons and failed checks
+    describe the spread, not the strategy.
+    """
+    decisions = store.all_decisions(session_only=session_only)
+    counts = store.decision_session_counts()
 
     by_symbol = Counter(d["symbol"] for d in decisions)
     by_state = Counter(d["state"] for d in decisions)
@@ -132,4 +152,7 @@ def build(store: Store) -> ActivityLedger:
         failed_checks=failed.most_common(),
         watch_promotions=promotions,
         total_decisions=len(decisions),
+        session_only=session_only,
+        out_of_session=counts["out_of_session"] if session_only else 0,
+        unrecorded_session=counts["unrecorded"] if session_only else 0,
     )

@@ -356,11 +356,18 @@ def past_hard_close(when: datetime | None = None) -> bool:
 
 @dataclass(frozen=True)
 class LoopConfig:
+    #: Cadence while the market is OPEN.
     scan_interval_minutes: int = 15
     #: Section 5.1 — a WATCH item expires after this many scan cycles.
     watch_expiry_cycles: int = 2
-    #: Poll interval used when the market is closed.
+    #: Cadence while the market is CLOSED. The pipeline still runs out of hours
+    #: (the decision record and score distribution keep accumulating), but no
+    #: order is submitted, so there is no reason to poll as hard. Raise this to
+    #: scan less overnight; it is the real cadence, not a placeholder.
     closed_market_sleep_minutes: int = 15
+
+    def interval_minutes(self, market_open: bool) -> int:
+        return self.scan_interval_minutes if market_open else self.closed_market_sleep_minutes
 
 
 LOOP = LoopConfig()
@@ -422,6 +429,7 @@ def summary() -> dict:
         "past_hard_close": past_hard_close(),
         "watch_expiry_cycles": LOOP.watch_expiry_cycles,
         "scan_interval_minutes": LOOP.scan_interval_minutes,
+        "closed_market_sleep_minutes": LOOP.closed_market_sleep_minutes,
         "requote_attempts": EXECUTION.requote_attempts,
         "requote_wait_seconds": EXECUTION.requote_wait_seconds,
         "dry_run": ENV.dry_run,

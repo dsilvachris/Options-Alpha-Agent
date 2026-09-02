@@ -207,6 +207,15 @@ would silently block every real trade with exposure that does not exist.
   order and Alpaca rejects the duplicate server-side; but once a position has
   closed, the sequence advances so the same setup can legitimately be traded
   again later the same day.
+* **No order is submitted while the market is closed.** The session state comes
+  from `get_clock` on every cycle and arms two independent gates: the risk gate
+  refuses new entries with reason `MARKET_CLOSED`, and the order layer refuses
+  *all* submission — entries and exits alike, since exits bypass the risk gate.
+  A stop firing overnight off a stale mark cannot queue an order into a closed
+  book. The full pipeline still runs, so the decision record and score
+  distribution keep accumulating out of hours; exit triggers are still evaluated
+  and logged as `EXIT_DEFERRED` and acted on at the next open. The manual
+  `flatten` command can force through.
 * **Broker-truth reconciliation.** At startup and at the top of every scan
   cycle, positions and orders are reconciled against Alpaca before any new
   opportunity is evaluated. Untracked broker positions are adopted so the exit
@@ -240,7 +249,7 @@ cap or interval is hardcoded anywhere else.
 | Max concurrent positions | 4 |
 | Profit target / stop / time exit | 50% of credit / 2× credit / 1 DTE |
 | WATCH expiry window | 2 scan cycles |
-| Scan interval | 15 minutes |
+| Scan interval | 15 minutes open, 15 minutes closed (`closed_market_sleep_minutes`) |
 | Spread width | 5.0 points (see the check 5 / check 7 tradeoff in `config.py`) |
 | Order pricing | limit at the net mid, then 3 re-quotes toward the crossing price |
 | Score bands | ≥80 TRADE, 60–79 WATCH, <60 REJECT |
@@ -254,6 +263,16 @@ used anywhere in the agent. Timestamps are **stored in UTC** and **rendered in
 market time** on every human-facing surface — CLI, event log, decision cards and
 dashboard. This host runs in Europe, where a local-time assumption would shift
 every session boundary and DTE by a day for part of each evening.
+
+### Scheduling
+
+`run_forever` fires the first cycle **immediately** — starting at 09:30 scans at
+09:30 — then paces off a monotonic deadline advanced by the interval, not a
+`sleep(interval)` after each cycle. Sleeping afterwards makes the period
+`interval + cycle duration`, drifting ~8s per iteration and never landing on a
+boundary; that matters because the expiry-day 15:30 close and the 09-04 hard
+close fire on a *scan*, not on a timer. If a cycle overruns its slot the loop
+skips whole intervals rather than firing catch-up scans back to back.
 
 ### Order pricing
 

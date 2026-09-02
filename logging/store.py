@@ -63,6 +63,11 @@ CREATE TABLE IF NOT EXISTS decisions (
     cycle_id      TEXT,
     symbol        TEXT NOT NULL,
     state         TEXT NOT NULL,
+    -- Was the US market open when this decision was made? Out-of-session
+    -- decisions are priced off wide after-hours quotes, so reports separate
+    -- them the same way dry-run positions are separated from live ones.
+    -- NULL means the market state was not recorded (pre-migration rows).
+    market_open   INTEGER,
     score         INTEGER,
     structure     TEXT,
     iv_condition  TEXT,
@@ -209,6 +214,13 @@ class Store:
         with _LOCK:
             columns = {r[1] for r in self._conn.execute(
                 "PRAGMA table_info(positions)").fetchall()}
+            decision_columns = {r[1] for r in self._conn.execute(
+                "PRAGMA table_info(decisions)").fetchall()}
+            if "market_open" not in decision_columns:
+                self._conn.execute(
+                    "ALTER TABLE decisions ADD COLUMN market_open INTEGER")
+                self._conn.commit()
+
             if "dry_run" not in columns:
                 self._conn.execute(
                     "ALTER TABLE positions ADD COLUMN dry_run INTEGER NOT NULL DEFAULT 0")
@@ -310,14 +322,15 @@ class Store:
     # -- decisions ---------------------------------------------------------
     def add_decision(self, **kw: Any) -> int:
         return self.execute(
-            "INSERT INTO decisions (ts, cycle_id, symbol, state, score, structure,"
-            " iv_condition, trend_condition, reason, card, detail)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO decisions (ts, cycle_id, symbol, state, market_open, score,"
+            " structure, iv_condition, trend_condition, reason, card, detail)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 kw.get("ts") or utcnow(),
                 kw.get("cycle_id"),
                 kw["symbol"],
                 kw["state"],
+                None if kw.get("market_open") is None else (1 if kw["market_open"] else 0),
                 kw.get("score"),
                 kw.get("structure"),
                 kw.get("iv_condition"),
@@ -331,8 +344,31 @@ class Store:
     def recent_decisions(self, limit: int = 100) -> list[dict]:
         return self.query("SELECT * FROM decisions ORDER BY id DESC LIMIT ?", (limit,))
 
-    def all_decisions(self) -> list[dict]:
+    def all_decisions(self, session_only: bool = False) -> list[dict]:
+        """
+        Every recorded decision.
+
+        `session_only=True` restricts to decisions made while the market was
+        open. Rows predating the market_open column (NULL) are treated as
+        out-of-session, because their pricing context is unknown.
+        """
+        if session_only:
+            return self.query(
+                "SELECT * FROM decisions WHERE market_open=1 ORDER BY id ASC")
         return self.query("SELECT * FROM decisions ORDER BY id ASC")
+
+    def decision_session_counts(self) -> dict:
+        rows = self.query(
+            "SELECT market_open, COUNT(*) AS n FROM decisions GROUP BY market_open")
+        out = {"in_session": 0, "out_of_session": 0, "unrecorded": 0}
+        for row in rows:
+            if row["market_open"] == 1:
+                out["in_session"] = row["n"]
+            elif row["market_open"] == 0:
+                out["out_of_session"] = row["n"]
+            else:
+                out["unrecorded"] = row["n"]
+        return out
 
     # -- watch items -------------------------------------------------------
     def get_watch_item(self, key: str) -> dict | None:

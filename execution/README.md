@@ -103,6 +103,14 @@ the store.
   status alone was the original bug: it left an order marked live with no
   position row behind it.
 
+* **The session gate lives at the submission layer, not only in the risk gate.**
+  `Executor.market_open` blocks `open_structure` and `close_structure` when the
+  market is known to be closed. Entries are already refused by the risk gate, but
+  **exits bypass the risk gate entirely**, so without a second gate a stop or
+  time exit firing overnight would queue a market order into a closed book to
+  fill at the next open at an unevaluated price. `close_structure(force=True)` is
+  the deliberate exception, used only by the manual `flatten` command.
+
 * **Simulated state must be cleared before going live.** `clear-simulated`
   retires open DRY_RUN positions with reason `DRY_RUN_CLEARED` and neutralises
   their order rows; decisions and events are left intact. `Agent.start()` refuses

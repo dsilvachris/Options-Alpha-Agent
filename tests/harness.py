@@ -641,6 +641,8 @@ async def run_all(only: int | None = None) -> int:
                 outcomes.append(await scenario_4_idempotency(mcp))
             else:
                 outcomes.append(Outcome("4 idempotency", None, "no MCP session"))
+        if only in (None, 8):
+            outcomes.append(await scenario_8_market_closed())
         if only in (None, 7):
             outcomes.append(await scenario_7_reentry_vs_retry())
         if only in (None, 6):
@@ -984,3 +986,112 @@ async def scenario_7_reentry_vs_retry() -> Outcome:
 
     return Outcome("7 re-entry vs retry", all(results),
                    f"{sum(results)}/{len(results)} assertions held")
+
+
+# ---------------------------------------------------------------------------
+# Scenario 8 — market closed: pipeline runs, nothing is submitted
+# ---------------------------------------------------------------------------
+
+
+async def scenario_8_market_closed() -> Outcome:
+    hdr("SCENARIO 8 — MARKET CLOSED: PIPELINE RUNS, NO ORDER IS SUBMITTED")
+    store = test_store("market_closed")
+    events = EventLog.start(store)
+    results: list[bool] = []
+
+    from risk.rules import MARKET_CLOSED
+
+    st = _reentry_structure()
+    mcp = SubmitRecorder()
+    executor = Executor(mcp, None, store, events, market_open=False)
+
+    was_dry = ENV.dry_run
+    object.__setattr__(ENV, "dry_run", False)
+    try:
+        sub("8a. Risk gate refuses entries with MARKET_CLOSED")
+        closed = risk_rules.evaluate(
+            structure=st, equity=100_000.0, open_positions=0,
+            same_direction_positions=0, proposed_bias=1, corporate_actions=[],
+            store=store, events=events, today=date(2026, 9, 1), market_open=False)
+        open_ok = risk_rules.evaluate(
+            structure=st, equity=100_000.0, open_positions=0,
+            same_direction_positions=0, proposed_bias=1, corporate_actions=[],
+            store=store, events=events, today=date(2026, 9, 1), market_open=True)
+        print(f"  market closed -> {closed.status}: {closed.reason[:64]}")
+        print(f"  market open   -> {open_ok.status}: {open_ok.contracts} contract(s)")
+        results += [not closed.approved, MARKET_CLOSED in closed.reason, open_ok.approved]
+
+        sub("8b. Entry submission blocked at the order layer")
+        entry = await executor.open_structure(st, open_ok, today=today_et())
+        print(f"  submitted={entry.submitted} status={entry.status}")
+        print(f"  broker place_option_order calls: {len(mcp.submits)} (must be 0)")
+        results += [not entry.submitted, len(mcp.submits) == 0]
+
+        sub("8c. Exit trigger EVALUATES but the order is blocked")
+        # Real legs: close_structure needs them to build the reversing order.
+        position = {
+            "position_key": "SPY|bull put credit spread|2026-09-04|test#0",
+            "symbol": "SPY", "structure": "bull put credit spread", "contracts": 4,
+            "credit": 320.0, "width": 5.0, "max_loss": 1680.0,
+            "expiry": "2026-09-04", "status": "OPEN", "dry_run": 0,
+            "legs": json.dumps([
+                {"symbol": "SPY260904P00755000", "side": "sell",
+                 "position_intent": "sell_to_open", "ratio_qty": 1,
+                 "strike": 755.0, "right": "P"},
+                {"symbol": "SPY260904P00750000", "side": "buy",
+                 "position_intent": "buy_to_open", "ratio_qty": 1,
+                 "strike": 750.0, "right": "P"},
+            ]),
+        }
+        at = datetime(2026, 9, 2, 20, 0, tzinfo=MARKET_TZ)  # after the close
+        reason, measures = executor.exit_trigger(position, 100.0, now=at)
+        print(f"  trigger evaluated -> {(reason or 'HOLD')[:60]}")
+        results.append(reason is not None and reason.startswith("profit target"))
+
+        closed_result = await executor.close_structure(position, reason, 100.0, today=date(2026, 9, 2))
+        print(f"  exit submitted={closed_result.submitted} status={closed_result.status}")
+        print(f"  broker calls still: {len(mcp.submits)} (must be 0)")
+        results += [not closed_result.submitted, len(mcp.submits) == 0]
+
+        sub("8d. Manual flatten may still force through")
+        forced = await executor.close_structure(
+            position, "end-of-window flatten", 100.0, today=date(2026, 9, 2), force=True)
+        print(f"  forced exit submitted={forced.submitted} "
+              f"broker calls={len(mcp.submits)} (must be 1)")
+        results += [forced.submitted, len(mcp.submits) == 1]
+
+        sub("8e. Decision recorded with market_open=false")
+        store.add_decision(cycle_id=events.cycle_id, symbol="SPY", state="REJECT",
+                           market_open=False, score=0,
+                           structure="bull put credit spread",
+                           reason=f"risk gate refused: {closed.reason}", card="x")
+        store.add_decision(cycle_id=events.cycle_id, symbol="SPY", state="TRADE",
+                           market_open=True, score=90,
+                           structure="bull put credit spread", reason="in session",
+                           card="y")
+        counts = store.decision_session_counts()
+        print(f"  session counts: {counts}")
+        in_session = store.all_decisions(session_only=True)
+        every = store.all_decisions(session_only=False)
+        print(f"  all_decisions(session_only=True)={len(in_session)}  "
+              f"all={len(every)}")
+        results += [counts["out_of_session"] >= 1, counts["in_session"] >= 1,
+                    len(in_session) < len(every)]
+
+        sub("8f. Ledger defaults to in-session and counts the rest separately")
+        from monitoring import ledger as ledger_mod
+
+        led = ledger_mod.build(store, session_only=True)
+        print(f"  total (in-session)={led.total_decisions} "
+              f"out_of_session={led.out_of_session} "
+              f"unrecorded={led.unrecorded_session}")
+        results += [led.session_only, led.out_of_session >= 1]
+
+        sub("8g. Recorded event log")
+        show_events(store, events.cycle_id, (Stage.EXECUTION, Stage.POSITION_MANAGEMENT))
+    finally:
+        object.__setattr__(ENV, "dry_run", was_dry)
+
+    return Outcome("8 market closed", all(results),
+                   f"{sum(results)}/{len(results)} assertions held; broker received "
+                   f"{len(mcp.submits)} submit(s) (only the forced flatten)")

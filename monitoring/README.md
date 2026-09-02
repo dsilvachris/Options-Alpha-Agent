@@ -46,6 +46,14 @@ still reported. The split is deliberate:
 P&L measures money; the ledger measures decision behaviour. A dry run should
 show exactly what the agent decided while claiming to have earned nothing.
 
+## Session isolation
+
+Decisions carry `market_open`. Out-of-session candidates are priced off wide
+after-hours quotes, so their rejection reasons and failed checks describe the
+spread rather than the strategy. The ledger and the score-distribution report
+therefore default to **in-session only**, counting out-of-session and
+market-state-unrecorded decisions separately. `--all-sessions` includes them.
+
 ## Non-obvious decisions
 
 * **The ledger computes no ratios at all.** Section 8.1 says raw counts, and

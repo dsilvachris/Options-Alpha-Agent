@@ -142,6 +142,8 @@ def reasoning_log_view(store: Store, limit: int | None = None) -> list[dict]:
             "cycle_id": r["cycle_id"],
             "symbol": r["symbol"],
             "state": r["state"],
+            "market_open": (None if r.get("market_open") is None
+                            else bool(r["market_open"])),
             "score": r["score"],
             "structure": r["structure"],
             "iv_condition": r["iv_condition"],
@@ -212,7 +214,7 @@ def mcp_activity_view(store: Store, limit: int | None = None) -> dict:
 def monitoring_view(store: Store) -> dict:
     """Section 8 panels: activity ledger, outcomes and baselines."""
     return {
-        "ledger": ledger_mod.build(store).to_dict(),
+        "ledger": ledger_mod.build(store, session_only=True).to_dict(),
         "outcomes": outcomes_mod.build(store).to_dict(),
         "baselines": baseline_mod.build(store).to_dict(),
     }

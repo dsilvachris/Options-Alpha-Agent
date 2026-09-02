@@ -61,6 +61,7 @@ class CycleResult:
     closed_positions: list[dict] = field(default_factory=list)
     expired_watches: list[dict] = field(default_factory=list)
     equity: float | None = None
+    market_open: bool = True
     halted: bool = False
     error: str | None = None
 
@@ -132,10 +133,17 @@ class Agent:
             self.store.add_equity_sample(account.equity, account.last_equity, events.cycle_id)
 
             clock = await self.market.clock()
+            market_open = bool(clock["is_open"])
+            result.market_open = market_open
+            # Both gates are armed from the same reading: the risk gate refuses
+            # entries, and the executor refuses every submission including exits.
+            executor.set_market_open(market_open)
             events.emit(
                 Stage.MARKET_SCAN,
                 f"Account equity ${account.equity:,.2f}; market "
-                f"{'OPEN' if clock['is_open'] else 'CLOSED'}",
+                f"{'OPEN' if market_open else 'CLOSED'}"
+                + ("" if market_open else
+                   " — pipeline runs, no order will be submitted"),
                 payload={
                     "equity": account.equity,
                     "cash": account.cash,
@@ -152,7 +160,8 @@ class Agent:
                 self.mcp, self.market, self.store, events).run()
 
             # ---- position management (exit discipline) --------------------
-            result.closed_positions = await self._manage_positions(executor, events, today)
+            result.closed_positions = await self._manage_positions(
+                executor, events, today, market_open)
 
             # ---- circuit breaker -----------------------------------------
             halted, halt_reason = risk_rules.circuit_breaker_state(self.store, account.equity)
@@ -164,7 +173,8 @@ class Agent:
             for symbol in UNIVERSE.watchlist:
                 try:
                     outcome = await self._evaluate_symbol(
-                        symbol, account, executor, watches, baselines, events, today
+                        symbol, account, executor, watches, baselines, events,
+                        today, market_open,
                     )
                 except MCPError as exc:
                     events.error(f"{symbol}: MCP failure — {exc}", symbol=symbol)
@@ -175,7 +185,7 @@ class Agent:
                 result.outcomes.append(outcome)
 
             # ---- WATCH expiry sweep --------------------------------------
-            result.expired_watches = watches.expire_stale()
+            result.expired_watches = watches.expire_stale(market_open)
 
             # ---- baselines -----------------------------------------------
             baselines.emit_summary()
@@ -203,9 +213,17 @@ class Agent:
 
     # -- position management ----------------------------------------------
     async def _manage_positions(
-        self, executor: Executor, events: EventLog, today: date
+        self, executor: Executor, events: EventLog, today: date,
+        market_open: bool = True,
     ) -> list[dict]:
-        """Apply exit discipline to every open position before scanning."""
+        """
+        Apply exit discipline to every open position before scanning.
+
+        Out of session the triggers are still EVALUATED and the intent recorded,
+        but no order is submitted — the position is acted on at the next open.
+        Evaluating anyway keeps the reasoning trail complete and means a stop
+        that fired overnight is visible rather than silently skipped.
+        """
         closed: list[dict] = []
         open_positions = self.store.open_positions()
         if not open_positions:
@@ -237,6 +255,30 @@ class Agent:
                 )
                 continue
 
+            if not market_open:
+                events.emit(
+                    Stage.POSITION_MANAGEMENT,
+                    f"EXIT DEFERRED — {position['symbol']} {position['structure']} "
+                    f"would exit now ({reason}) but the market is closed; "
+                    f"it will be acted on at the next open",
+                    symbol=position["symbol"],
+                    payload={"deferred": "MARKET_CLOSED", "reason": reason,
+                             **measures},
+                )
+                self.store.add_decision(
+                    cycle_id=events.cycle_id, symbol=position["symbol"],
+                    state="EXIT_DEFERRED", score=None, market_open=False,
+                    structure=position["structure"], reason=reason,
+                    card=decision_card.exit_card(
+                        symbol=position["symbol"], structure=position["structure"],
+                        exit_reason=f"{reason} [DEFERRED: market closed]",
+                        credit=float(position["credit"]),
+                        exit_cost=cost if cost is not None else 0.0,
+                        realized_pnl=0.0, contracts=int(position["contracts"])),
+                    detail={"measures": measures, "deferred": True},
+                )
+                continue
+
             await executor.close_structure(position, reason, cost, today=today)
             credit = float(position["credit"])
             realized = (credit - cost) if cost is not None else 0.0
@@ -253,6 +295,7 @@ class Agent:
                 cycle_id=events.cycle_id,
                 symbol=position["symbol"],
                 state="EXIT",
+                market_open=market_open,
                 score=None,
                 structure=position["structure"],
                 reason=reason,
@@ -272,6 +315,7 @@ class Agent:
         baselines: BaselineRecorder,
         events: EventLog,
         today: date,
+        market_open: bool = True,
     ) -> SymbolOutcome:
         # ---- Stage 1: Market Scan ----------------------------------------
         events.emit(Stage.MARKET_SCAN, f"Scanning {symbol}", symbol=symbol)
@@ -350,7 +394,7 @@ class Agent:
             events.emit(Stage.FINAL_DECISION, f"{symbol}: REJECT — {reason}",
                         symbol=symbol, payload={"reason": reason})
             self.store.add_decision(
-                cycle_id=events.cycle_id, symbol=symbol, state="REJECT", score=0,
+                cycle_id=events.cycle_id, symbol=symbol, market_open=market_open, state="REJECT", score=0,
                 structure=selection.structure, iv_condition=vol.condition,
                 trend_condition=trend.condition, reason=reason, card=card,
                 detail={"stage": "structure_selection"},
@@ -452,7 +496,7 @@ class Agent:
             events.emit(Stage.FINAL_DECISION, f"{symbol}: REJECT — {score_result.reason}",
                         symbol=symbol, payload={"reason": score_result.reason})
             self.store.add_decision(
-                cycle_id=events.cycle_id, symbol=symbol, state="REJECT",
+                cycle_id=events.cycle_id, symbol=symbol, market_open=market_open, state="REJECT",
                 score=score_result.score, structure=structure.structure,
                 iv_condition=vol.condition, trend_condition=trend.condition,
                 reason=score_result.reason, card=card, detail=detail,
@@ -481,7 +525,7 @@ class Agent:
                          "cycles_seen": outcome.cycles_seen},
             )
             self.store.add_decision(
-                cycle_id=events.cycle_id, symbol=symbol, state="WATCH",
+                cycle_id=events.cycle_id, symbol=symbol, market_open=market_open, state="WATCH",
                 score=score_result.score, structure=structure.structure,
                 iv_condition=vol.condition, trend_condition=trend.condition,
                 reason=score_result.promoting_condition, card=card, detail=detail,
@@ -500,6 +544,7 @@ class Agent:
             store=self.store,
             events=events,
             today=today,
+            market_open=market_open,
         )
         events.emit(
             Stage.RISK_REVIEW,
@@ -530,7 +575,7 @@ class Agent:
             events.emit(Stage.FINAL_DECISION, f"{symbol}: REJECT — {reason}",
                         symbol=symbol, payload={"reason": reason})
             self.store.add_decision(
-                cycle_id=events.cycle_id, symbol=symbol, state="REJECT",
+                cycle_id=events.cycle_id, symbol=symbol, market_open=market_open, state="REJECT",
                 score=score_result.score, structure=structure.structure,
                 iv_condition=vol.condition, trend_condition=trend.condition,
                 reason=reason, card=card, detail=detail,
@@ -572,7 +617,7 @@ class Agent:
             payload={"score": score_result.score, "order": detail["order"]},
         )
         self.store.add_decision(
-            cycle_id=events.cycle_id, symbol=symbol, state="TRADE",
+            cycle_id=events.cycle_id, symbol=symbol, market_open=market_open, state="TRADE",
             score=score_result.score, structure=structure.structure,
             iv_condition=vol.condition, trend_condition=trend.condition,
             reason=score_result.reason, card=card, detail=detail,
@@ -592,7 +637,7 @@ class Agent:
         events.emit(Stage.FINAL_DECISION, f"{symbol}: REJECT — {reason}",
                     symbol=symbol, payload={"reason": reason})
         self.store.add_decision(
-            cycle_id=events.cycle_id, symbol=symbol, state="REJECT", score=0,
+            cycle_id=events.cycle_id, symbol=symbol, market_open=market_open, state="REJECT", score=0,
             structure=selection.structure, iv_condition=vol.condition,
             trend_condition=trend.condition, reason=reason, card=card,
             detail={"stage": "strategy_selection", "iv_condition": vol.condition,
@@ -616,17 +661,49 @@ class Agent:
     # -- continuous loop ---------------------------------------------------
     async def run_forever(self) -> None:
         """
-        Unattended scan loop.
+        Unattended scan loop, on a monotonic schedule.
+
+        The first cycle runs immediately — starting the agent at 09:30 scans at
+        09:30, it does not wait an interval.
+
+        Cadence is driven by a deadline advanced by the interval, not by sleeping
+        for the interval after each cycle. Sleeping afterwards makes the period
+        `interval + cycle duration`, so scans drift later by ~8s every iteration
+        and never land on a boundary. That matters because the expiry-day 15:30
+        close and the 09-04 hard close fire on a *scan*, not on a timer: a
+        drifted loop reaches them late.
+
+        The interval itself depends on the session — LOOP.scan_interval_minutes
+        while open, LOOP.closed_market_sleep_minutes while closed.
 
         A cycle failure never terminates the loop: the MCP client reconnects on
         its own, and any other error is recorded and retried next interval.
         """
+        loop = asyncio.get_running_loop()
+        next_run = loop.time()
+
         while True:
+            market_open = True
             try:
                 result = await self.run_cycle()
+                market_open = result.market_open
                 if result.error:
                     print(f"[cycle {result.cycle_id}] error: {result.error}")
             except Exception as exc:  # noqa: BLE001 - the loop must survive
                 self.store.add_event(Stage.ERROR, f"Loop iteration failed: {exc}")
                 print(f"[loop] error: {exc}")
-            await asyncio.sleep(LOOP.scan_interval_minutes * 60)
+
+            interval = LOOP.interval_minutes(market_open) * 60
+            next_run += interval
+            now = loop.time()
+            if next_run <= now:
+                # The cycle overran its slot. Skip whole intervals rather than
+                # firing a burst of catch-up scans back to back.
+                missed = int((now - next_run) // interval) + 1
+                next_run += missed * interval
+                self.store.add_event(
+                    Stage.ERROR,
+                    f"Scan overran its {interval / 60:.0f}m slot; skipped "
+                    f"{missed} interval(s) to stay on schedule",
+                )
+            await asyncio.sleep(max(0.0, next_run - loop.time()))

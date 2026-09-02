@@ -176,7 +176,7 @@ async def cmd_loop(_: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 # scores (Section 4.4)
 # ---------------------------------------------------------------------------
-def cmd_scores(_: argparse.Namespace) -> int:
+def cmd_scores(args: argparse.Namespace) -> int:
     """
     Section 4.4 calibration report.
 
@@ -184,8 +184,22 @@ def cmd_scores(_: argparse.Namespace) -> int:
     adjusted against observed data rather than assumptions made in advance.
     """
     store = get_store()
-    decisions = [d for d in store.all_decisions() if d["score"] is not None]
+    session_only = not args.all_sessions
+    decisions = [d for d in store.all_decisions(session_only=session_only)
+                 if d["score"] is not None]
+    counts = store.decision_session_counts()
     rule("SCORE DISTRIBUTION (Section 4.4 calibration)")
+    scope = "IN-SESSION ONLY" if session_only else "ALL SESSIONS"
+    print(f"Scope: {scope}"
+          + (f"  ({counts['out_of_session']} out-of-session and "
+             f"{counts['unrecorded']} unrecorded excluded; --all-sessions to include)"
+             if session_only else ""))
+    if session_only and not decisions and (counts["out_of_session"] or counts["unrecorded"]):
+        print(f"\n{AMBER}No in-session scored opportunities yet.{RESET} "
+              f"Out-of-session candidates are priced off wide after-hours quotes, "
+              f"so they are\nexcluded by default — the real calibration run is "
+              f"during market hours. Use --all-sessions to see them anyway.")
+        return 0
 
     if not decisions:
         print("No scored opportunities recorded yet. Run `cli.py scan` first.")
@@ -318,10 +332,10 @@ async def cmd_flatten(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 # reports
 # ---------------------------------------------------------------------------
-def cmd_ledger(_: argparse.Namespace) -> int:
+def cmd_ledger(args: argparse.Namespace) -> int:
     store = get_store()
     rule()
-    print(ledger_mod.build(store).render())
+    print(ledger_mod.build(store, session_only=not args.all_sessions).render())
     rule()
     print(outcomes_mod.build(store).render())
     rule()
@@ -466,12 +480,16 @@ def main() -> int:
                       help="print the full check breakdown per symbol")
 
     sub.add_parser("loop", help="run continuously at the configured interval")
-    sub.add_parser("scores", help="Section 4.4 score-distribution report")
+    scores = sub.add_parser("scores", help="Section 4.4 score-distribution report")
+    scores.add_argument("--all-sessions", action="store_true",
+                        help="include decisions made outside market hours")
 
     flatten = sub.add_parser("flatten", help="close all open positions")
     flatten.add_argument("-y", "--yes", action="store_true", help="skip confirmation")
 
-    sub.add_parser("ledger", help="Section 8 monitoring report")
+    ledger_p = sub.add_parser("ledger", help="Section 8 monitoring report")
+    ledger_p.add_argument("--all-sessions", action="store_true",
+                          help="include decisions made outside market hours")
 
     cards = sub.add_parser("cards", help="print recorded decision cards")
     cards.add_argument("-n", "--limit", type=int, default=20)
@@ -491,7 +509,7 @@ def main() -> int:
 
     selftest = sub.add_parser(
         "selftest", help="dry-run harness for the exit/order/failure paths")
-    selftest.add_argument("--scenario", type=int, default=None, choices=[1, 2, 3, 4, 5, 6, 7],
+    selftest.add_argument("--scenario", type=int, default=None, choices=[1, 2, 3, 4, 5, 6, 7, 8],
                           help="run only one scenario")
 
     dash = sub.add_parser("dashboard", help="serve the dashboard")
