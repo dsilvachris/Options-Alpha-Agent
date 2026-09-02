@@ -1,20 +1,31 @@
 {
  "meta": {
-  "generated_at": "2026-09-02T08:13:01.951634-04:00",
-  "generated_at_display": "08:13 EDT",
-  "generated_at_utc": "2026-09-02T12:13:01.951662+00:00",
+  "generated_at": "2026-09-02T09:56:04.380213-04:00",
+  "generated_at_display": "09:56 EDT",
+  "generated_at_utc": "2026-09-02T13:56:04.380236+00:00",
   "timezone": "America/New_York",
-  "market_open": false,
+  "market_open": true,
   "mode": "static",
-  "dry_run": true
+  "dry_run": false
  },
- "opportunities_by_underlying": {},
- "decisions_by_state": {},
+ "opportunities_by_underlying": {
+  "IWM": 2,
+  "QQQ": 2,
+  "SPY": 2
+ },
+ "decisions_by_state": {
+  "TRADE": 6
+ },
  "rejection_reasons": [],
  "failed_checks": [],
- "not_evaluable_checks": [],
+ "not_evaluable_checks": [
+  {
+   "check": "#2 volatility stable",
+   "count": 6
+  }
+ ],
  "watch_promotions": [],
- "total_decisions": 0,
+ "total_decisions": 6,
  "session_only": true,
  "out_of_session": 8,
  "unrecorded_session": 24
