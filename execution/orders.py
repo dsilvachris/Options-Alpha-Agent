@@ -36,12 +36,32 @@ from logging.events import EventLog, Stage
 from logging.store import Store
 from perception.market import MarketData
 from perception.mcp_client import AlpacaMCP, MCPError
-from execution.reconcile import UNTRUSTED_LOCAL_STATUSES
+from execution.reconcile import (ENTRY_CANCELLED, UNTRUSTED_LOCAL_STATUSES,
+                                 WORKING_ORDER_STATUSES)
 from perception.normalize import as_obj, iter_records, pick, to_float
 from risk.rules import ExitPlan, RiskDecision, trip_circuit_breaker
 
 OPEN_INTENT = "open"
 CLOSE_INTENT = "close"
+
+#: Markers in the broker's rejection of a replacement that changes nothing.
+#: Alpaca answers 422 "order parameters are not changed" when the replacement
+#: carries the limit the order already has.
+_NOOP_REQUOTE_MARKERS = ("order parameters are not changed",
+                         "parameters are not changed",
+                         "order is not changed")
+
+
+def is_noop_requote(error: BaseException | str) -> bool:
+    """
+    True when a re-quote was refused because it would change nothing.
+
+    This is not a failure of the order — the order is alive and unchanged at the
+    price it already carries — so the ladder must step past it rather than give
+    up the remaining, genuinely different prices.
+    """
+    text = str(error).lower()
+    return any(marker in text for marker in _NOOP_REQUOTE_MARKERS)
 
 
 def structural_key(symbol: str, structure: str, expiry: date, legs: list[Leg]) -> str:
@@ -187,7 +207,35 @@ class Executor:
         if mid <= cross:
             return []
         step = (mid - cross) / attempts
-        return [round(mid - step * k, 2) for k in range(1, attempts + 1)]
+        return self._distinct_steps(
+            mid, [round(mid - step * k, 2) for k in range(1, attempts + 1)])
+
+    @classmethod
+    def _distinct_steps(cls, mid: float, candidates: list[float]) -> list[float]:
+        """
+        Drop ladder steps that would transmit a limit price already resting.
+
+        Net prices are carried in dollars per spread but transmitted as a
+        per-share limit rounded to the cent, so every step narrower than $1.00
+        of net collapses onto the limit before it. Replacing an order with the
+        limit it already carries is not an order at all: Alpaca rejects it 422
+        "order parameters are not changed", which cost a whole ladder its
+        re-quotes.
+
+        The LAST member of each run of equal limits is kept, not the first, so
+        the walk still ends exactly on the crossing price instead of a cent
+        above it. Steps that collapse onto the resting mid are dropped outright.
+        """
+        resting = cls._limit_price(mid, 1)
+        limits = [cls._limit_price(price, 1) for price in candidates]
+        out: list[float] = []
+        for index, (price, limit) in enumerate(zip(candidates, limits)):
+            if limit == resting:
+                continue  # a no-op against the order already working
+            if index + 1 < len(limits) and limits[index + 1] == limit:
+                continue  # a later, better-priced step transmits this same limit
+            out.append(price)
+        return out
 
     async def _order_status(self, order_id: str) -> str:
         try:
@@ -219,6 +267,7 @@ class Executor:
         order_id = broker_order_id
         terminal = {"filled", "canceled", "expired", "rejected", "done_for_day"}
 
+        transmitted = 0
         for attempt, price in enumerate([None] + ladder):
             if price is not None:
                 new_limit = self._limit_price(price, 1)
@@ -228,6 +277,25 @@ class Executor:
                         {"order_id": order_id, "limit_price": new_limit},
                     )
                 except MCPError as exc:
+                    if is_noop_requote(exc):
+                        # The resting order already carries this limit, so there
+                        # is nothing to replace. Step to the next distinct price
+                        # instead of abandoning the rest of the ladder — the
+                        # walk toward the cross is what gets this order filled.
+                        self.events.emit(
+                            Stage.EXECUTION,
+                            f"Re-quote {attempt}/{len(ladder)} skipped for "
+                            f"{structure.symbol}: limit {new_limit} is already "
+                            f"working (broker refused the replacement as "
+                            f"unchanged); stepping to the next distinct price",
+                            symbol=structure.symbol,
+                            payload={"attempt": attempt, "of": len(ladder),
+                                     "limit_price": new_limit,
+                                     "skipped": "NO_OP_REQUOTE",
+                                     "client_order_id": coid,
+                                     "order_id": order_id},
+                        )
+                        continue
                     self.events.error(
                         f"Re-quote {attempt}/{len(ladder)} failed for "
                         f"{structure.symbol}: {exc}",
@@ -254,7 +322,8 @@ class Executor:
                         "order_id": replaced_id or order_id,
                     },
                 )
-                result["requotes"] = attempt
+                transmitted += 1
+                result["requotes"] = transmitted
                 result["final_price"] = price
                 if replaced_id:
                     order_id = str(replaced_id)
@@ -808,6 +877,159 @@ class Executor:
                 payload={"results": results, "broker": str(broker)[:500]},
             )
         return {"positions": results, "broker": broker, "dry_run": ENV.dry_run}
+
+
+    # -- end-of-cycle order hygiene ---------------------------------------
+    async def cancel_unfilled_entries(self) -> list[dict]:
+        """
+        Cancel every entry order still working at the end of the scan cycle.
+
+        An unfilled entry that is left resting is a standing instruction priced
+        against quotes the agent can no longer see: it can fill hours later, at
+        an edge that has since decayed, off a decision nothing re-evaluated.
+
+        It is also a bookkeeping hazard, and that is the sharper one. The
+        position row is written at submission, so a never-filled entry leaves a
+        row the broker has nothing behind. Reconciliation used to close that row
+        as RECONCILED_MISSING while the order was still live, which advances the
+        entry sequence — and the next cycle would then pass the idempotency
+        probe with a fresh client_order_id and open a SECOND position in the
+        same underlying if the original order finally filled.
+
+        So the cycle that places an order owns it. Anything unfilled is
+        cancelled here and re-priced against fresh quotes next cycle. Exits are
+        deliberately untouched: a working exit is trying to close risk and must
+        be left alone.
+
+        Every candidate's status is re-read from the broker immediately before
+        the cancel, because a fill landing between the last status read and now
+        must not be cancelled out from under its position.
+        """
+        cancelled: list[dict] = []
+        for order in self.store.orders_today():
+            if order.get("dry_run") or order.get("intent") != OPEN_INTENT:
+                continue
+            if str(order.get("status") or "").lower() not in WORKING_ORDER_STATUSES:
+                continue
+
+            coid = order["client_order_id"]
+            symbol = order.get("symbol")
+            status = str(order.get("status") or "").lower()
+            broker_id = order.get("broker_order_id")
+
+            confirmed = await self._broker_order(coid)
+            if confirmed is not None:
+                status = str(pick(confirmed, "status", default=status) or "").lower()
+                broker_id = pick(confirmed, "id", "order_id") or broker_id
+                self.store.update_order(coid, status=status,
+                                        broker_order_id=broker_id, response=confirmed)
+            if status not in WORKING_ORDER_STATUSES:
+                continue  # filled, already cancelled, or otherwise settled
+
+            if not broker_id:
+                self.events.error(
+                    f"Entry {coid} is still working but no broker order id was "
+                    "recorded, so it cannot be cancelled — MANUAL REVIEW REQUIRED",
+                    symbol=symbol, payload={"client_order_id": coid, "status": status},
+                )
+                continue
+
+            try:
+                await self.mcp.call("cancel_order_by_id", {"order_id": str(broker_id)})
+            except MCPError as exc:
+                self.events.error(
+                    f"Could not cancel unfilled entry {coid} for {symbol}: {exc}",
+                    symbol=symbol,
+                    payload={"client_order_id": coid, "order_id": str(broker_id)},
+                )
+                continue
+
+            # Alpaca answers a cancel with an empty body, so the outcome is read
+            # back rather than assumed: the cancel can still lose a race with a
+            # fill, and recording "canceled" for a filled order would abandon a
+            # live position.
+            after = await self._broker_order(coid)
+            final = (str(pick(after, "status", default="pending_cancel") or "").lower()
+                     if after is not None else "pending_cancel")
+            filled_qty = to_float(pick(after, "filled_qty"), 0.0) if after else 0.0
+            self.store.update_order(coid, status=final, broker_order_id=broker_id,
+                                    response=after if after is not None else {"cancel_requested": True})
+
+            record = {"client_order_id": coid, "symbol": symbol,
+                      "order_id": str(broker_id), "status": final,
+                      "filled_qty": filled_qty, "position_closed": False}
+
+            if final == "filled" or (filled_qty or 0) > 0:
+                # It filled first. Leave the position row alone; reconciliation
+                # owns whatever the broker actually holds.
+                self.events.emit(
+                    Stage.EXECUTION,
+                    f"CANCEL RACED A FILL — {symbol} entry {coid} filled "
+                    f"({filled_qty:g} contract(s)) before the cancel landed; the "
+                    "position row is kept and reconciliation will confirm it",
+                    symbol=symbol, payload=record,
+                )
+                cancelled.append(record)
+                continue
+
+            record["position_closed"] = self._retire_unfilled_position(coid, symbol, final)
+            self.events.emit(
+                Stage.EXECUTION,
+                f"ENTRY CANCELLED — {symbol} entry {coid} was still working at the "
+                f"end of the cycle that placed it and never filled; cancelled "
+                f"(broker status {final}) so the next cycle re-prices against "
+                "fresh quotes",
+                symbol=symbol, payload={"cancelled": "UNFILLED_ENTRY", **record},
+            )
+            cancelled.append(record)
+
+        if cancelled:
+            self.events.emit(
+                Stage.EXECUTION,
+                f"End-of-cycle sweep cancelled {len(cancelled)} unfilled entry "
+                "order(s); none were left resting at the broker",
+                payload={"cancelled": cancelled},
+            )
+        return cancelled
+
+    async def _broker_order(self, coid: str) -> dict | None:
+        """Current broker record for a client order id, or None if unreadable."""
+        try:
+            raw = await self.mcp.call("get_order_by_client_id",
+                                      {"client_order_id": coid})
+        except MCPError:
+            return None
+        obj = as_obj(raw)
+        return obj if isinstance(obj, dict) else None
+
+    def _retire_unfilled_position(self, coid: str, symbol: str | None,
+                                  status: str) -> bool:
+        """
+        Close the position row behind an entry that was cancelled unfilled.
+
+        The row was written at submission for an order that never filled, so
+        nothing was ever held and there is no P&L to realize. Closing it here
+        rather than leaving it for reconciliation keeps the reason honest
+        (ENTRY_CANCELLED, not RECONCILED_MISSING) and lets the entry sequence
+        advance so the setup can be re-entered next cycle at a fresh price.
+        """
+        rows = self.store.query(
+            "SELECT * FROM positions WHERE entry_order_id=? AND status='OPEN'",
+            (coid,),
+        )
+        for row in rows:
+            self.store.close_position(row["position_key"], ENTRY_CANCELLED, None, None)
+            self.events.emit(
+                Stage.POSITION_MANAGEMENT,
+                f"POSITION RETIRED — {row['symbol']} {row['structure']} was "
+                f"recorded when its entry was submitted, but that entry was "
+                f"cancelled unfilled ({status}); the row is closed as "
+                f"{ENTRY_CANCELLED} with no realized P&L",
+                symbol=row["symbol"],
+                payload={"position_key": row["position_key"],
+                         "client_order_id": coid, "exit_reason": ENTRY_CANCELLED},
+            )
+        return bool(rows)
 
     # -- reconciliation ----------------------------------------------------
     async def sync_order_status(self) -> None:

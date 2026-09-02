@@ -134,6 +134,9 @@ async def cmd_scan(args: argparse.Namespace) -> int:
     print(f"equity:   {'—' if result.equity is None else f'${result.equity:,.2f}'}")
     print(f"closed:   {len(result.closed_positions)} position(s)")
     print(f"expired:  {len(result.expired_watches)} watch item(s)")
+    if result.cancelled_entries:
+        print(f"cancelled:{len(result.cancelled_entries)} unfilled entry order(s) "
+              f"— none left resting at the broker")
     if result.halted:
         print(f"{RED}circuit breaker: ACTIVE — no new orders today{RESET}")
     if result.error:
@@ -605,7 +608,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     selftest = sub.add_parser(
         "selftest", help="dry-run harness for the exit/order/failure paths")
-    selftest.add_argument("--scenario", type=int, default=None, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9],
+    selftest.add_argument("--scenario", type=int, default=None, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
                           help="run only one scenario")
 
     dash = sub.add_parser("dashboard", help="serve the dashboard")

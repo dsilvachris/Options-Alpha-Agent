@@ -60,6 +60,8 @@ class CycleResult:
     outcomes: list[SymbolOutcome] = field(default_factory=list)
     closed_positions: list[dict] = field(default_factory=list)
     expired_watches: list[dict] = field(default_factory=list)
+    #: Entry orders still unfilled at the end of this cycle, cancelled by it.
+    cancelled_entries: list[dict] = field(default_factory=list)
     equity: float | None = None
     market_open: bool = True
     halted: bool = False
@@ -192,6 +194,14 @@ class Agent:
 
             if not ENV.dry_run:
                 await executor.sync_order_status()
+                # Last thing in the cycle, after status has been refreshed: no
+                # entry order this cycle placed may outlive it. An unfilled
+                # entry left resting fills later against quotes nothing
+                # re-evaluated, and its position row would be closed as missing
+                # while the order is still live — which advances the entry
+                # sequence and lets the next cycle open a second position in the
+                # same underlying.
+                result.cancelled_entries = await executor.cancel_unfilled_entries()
 
         except Exception as exc:  # noqa: BLE001 - recorded, loop continues next cycle
             result.error = f"{type(exc).__name__}: {exc}"
@@ -206,6 +216,7 @@ class Agent:
                              for o in result.outcomes],
                 "closed": len(result.closed_positions),
                 "expired_watches": len(result.expired_watches),
+                "cancelled_entries": len(result.cancelled_entries),
                 "halted": result.halted,
             },
         )

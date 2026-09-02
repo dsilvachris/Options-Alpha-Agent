@@ -43,6 +43,10 @@ RECONCILED_MISSING = "RECONCILED_MISSING"
 RECONCILED_ADOPTED = "RECONCILED_ADOPTED"
 #: Exit reason for a simulated position retired by `cli.py clear-simulated`.
 DRY_RUN_CLEARED = "DRY_RUN_CLEARED"
+#: Exit reason for a position row whose entry order was cancelled unfilled at
+#: the end of the cycle that placed it. Nothing was ever held, so the row is
+#: retired with no realized P&L.
+ENTRY_CANCELLED = "ENTRY_CANCELLED"
 
 
 class SimulatedPositionsPresent(RuntimeError):
@@ -146,6 +150,22 @@ LIVE_ORDER_STATUSES = {
     "accepted_for_bidding", "calculated", "held", "replaced",
 }
 
+#: Broker order statuses for an entry that is still working: it has not filled,
+#: has not been cancelled, and the book can still fill it at any moment. These
+#: are the orders the end-of-cycle sweep cancels.
+WORKING_ORDER_STATUSES = {
+    "new", "accepted", "partially_filled", "pending_new",
+    "accepted_for_bidding", "calculated", "held", "replaced",
+    "pending_replace", "pending_review", "suspended",
+}
+
+#: Statuses under which an order can still produce a fill, INCLUDING one whose
+#: cancel has been requested but not yet confirmed. Wider than
+#: WORKING_ORDER_STATUSES on purpose: `pending_cancel` needs no second cancel
+#: request, but a position behind it must still not be closed as missing,
+#: because the cancel can lose the race with a fill.
+UNSETTLED_ORDER_STATUSES = WORKING_ORDER_STATUSES | {"pending_cancel"}
+
 
 @dataclass
 class ReconcileReport:
@@ -154,6 +174,9 @@ class ReconcileReport:
     matched: int = 0
     broker_option_legs: int = 0
     skipped_dry_run: int = 0
+    #: Positions the broker holds no legs for, left OPEN because their entry
+    #: order is still working and can still fill.
+    working_entry: list[dict] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -167,6 +190,7 @@ class ReconcileReport:
             "matched": self.matched,
             "broker_option_legs": self.broker_option_legs,
             "skipped_dry_run": self.skipped_dry_run,
+            "working_entry": self.working_entry,
             "errors": self.errors,
         }
 
@@ -176,6 +200,7 @@ class ReconcileReport:
             f"positions matched:  {self.matched}",
             f"adopted:            {len(self.adopted)}",
             f"closed as missing:  {len(self.closed_missing)}",
+            f"entry still working:{len(self.working_entry):>3}",
             f"dry-run skipped:    {self.skipped_dry_run}",
         ]
         for a in self.adopted:
@@ -183,6 +208,9 @@ class ReconcileReport:
                          f"credit ${a['credit']:.2f} expiry {a['expiry']}")
         for c in self.closed_missing:
             lines.append(f"  CLOSED  {c['symbol']} {c['structure']} — {RECONCILED_MISSING}")
+        for w in self.working_entry:
+            lines.append(f"  KEPT    {w['symbol']} {w['structure']} — entry order "
+                         f"{w['client_order_id']} still working ({w['status']})")
         for e in self.errors:
             lines.append(f"  ERROR   {e}")
         return "\n".join(lines)
@@ -333,6 +361,49 @@ class Reconciler:
                 self.events.error(f"Reconcile: could not list orders — {exc}")
                 return []
         return iter_records(raw)
+
+    async def working_orders(self) -> list[dict] | None:
+        """
+        Orders still live at the broker, nested so multi-leg legs come back.
+
+        Returns None — distinct from an empty list — when the broker could not
+        be asked. The caller must not treat "I could not read the orders" as
+        "there are no orders": that is precisely the reading that closes a
+        position whose entry is still working.
+        """
+        try:
+            raw = await self.mcp.call(
+                "get_orders",
+                {"status": "open", "limit": 200, "nested": True, "direction": "desc"},
+            )
+        except MCPError as exc:
+            self.events.error(f"Reconcile: could not list open orders — {exc}")
+            return None
+        return iter_records(raw)
+
+    @staticmethod
+    def _working_index(orders: list[dict]) -> tuple[dict[str, str], dict[str, str]]:
+        """
+        Index live orders two ways: by client order id, and by leg symbol.
+
+        Both are needed. A position row normally carries the client_order_id it
+        was opened with, but an adopted row may carry none, and a re-quoted
+        order can be replaced into a new broker id — the legs still identify it.
+        Only statuses that can still produce a fill are indexed, `pending_cancel`
+        included: a cancel in flight has not settled anything yet.
+        """
+        by_coid: dict[str, str] = {}
+        by_leg: dict[str, str] = {}
+        for order in orders:
+            status = str(pick(order, "status", default="") or "").lower()
+            if status not in UNSETTLED_ORDER_STATUSES:
+                continue
+            coid = pick(order, "client_order_id")
+            if isinstance(coid, str) and coid:
+                by_coid[coid] = status
+            for leg in legs_from_order(order):
+                by_leg[leg["symbol"]] = status
+        return by_coid, by_leg
 
     # -- reconstruction ----------------------------------------------------
     def reconstruct(self, legs: list[dict], contracts: int,
@@ -553,6 +624,27 @@ class Reconciler:
                         report.adopted.append(adopted)
 
         # ---- direction 2: store has it, broker does not -------------------
+        # A position with no broker legs behind it is not necessarily gone: its
+        # entry order may still be working, in which case the legs appear the
+        # moment it fills. Closing the row then would advance the entry sequence
+        # and let the next cycle open a SECOND position in the same underlying
+        # off the same setup. So open ORDERS are consulted here, not just
+        # positions, and a broker that cannot be asked closes nothing.
+        working = await self.working_orders()
+        if working is None:
+            report.errors.append(
+                "could not read open orders; no position was closed as missing "
+                "this pass — an entry still working would have been closed while "
+                "it could still fill")
+            self.events.emit(
+                Stage.POSITION_MANAGEMENT,
+                "Reconciliation skipped the close-missing pass: the broker's open "
+                "orders could not be read, and closing a position whose entry is "
+                "still working would let the next cycle re-enter the same setup",
+                payload={"skipped": "CLOSE_MISSING", "reason": "open orders unreadable"},
+            )
+        working_coids, working_legs = self._working_index(working or [])
+
         for position in local_positions:
             detail = _loads(position.get("detail")) or {}
             if position.get("dry_run") or detail.get("dry_run"):
@@ -566,6 +658,41 @@ class Reconciler:
             if symbols & set(broker_legs):
                 report.matched += 1
                 continue
+
+            if working is None:
+                continue
+
+            entry = position.get("entry_order_id")
+            status = working_coids.get(entry) if isinstance(entry, str) else None
+            if status is None:
+                # No entry order id recorded (an adopted row), or a replacement
+                # gave the live order a different id: fall back to its legs.
+                status = next((working_legs[s] for s in sorted(symbols)
+                               if s in working_legs), None)
+            if status is not None:
+                report.working_entry.append({
+                    "symbol": position["symbol"], "structure": position["structure"],
+                    "position_key": position["position_key"],
+                    "client_order_id": entry if isinstance(entry, str) else "(matched by leg)",
+                    "status": status,
+                })
+                self.events.emit(
+                    Stage.POSITION_MANAGEMENT,
+                    f"ENTRY STILL WORKING — {position['symbol']} "
+                    f"{position['structure']} has no broker legs yet, but its entry "
+                    f"order is still live at the broker (status {status}); the "
+                    f"position row is KEPT rather than closed as "
+                    f"{RECONCILED_MISSING}, because closing it would advance the "
+                    "entry sequence and let the next cycle open a second position "
+                    "in the same underlying",
+                    symbol=position["symbol"],
+                    payload={"reconcile": "ENTRY_STILL_WORKING",
+                             "position_key": position["position_key"],
+                             "client_order_id": entry,
+                             "status": status, "legs": sorted(symbols)},
+                )
+                continue
+
             self.store.close_position(
                 position["position_key"], RECONCILED_MISSING, None, None)
             report.closed_missing.append({
@@ -587,6 +714,7 @@ class Reconciler:
             Stage.POSITION_MANAGEMENT,
             f"Reconciliation complete — {len(report.adopted)} adopted, "
             f"{len(report.closed_missing)} closed as missing, "
+            f"{len(report.working_entry)} kept with a working entry order, "
             f"{report.matched} matched, {report.skipped_dry_run} dry-run skipped",
             payload=report.to_dict(),
         )

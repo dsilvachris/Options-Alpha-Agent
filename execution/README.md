@@ -70,6 +70,25 @@ the store.
   fill at the priced credit should not fill at all. An exit triggered by a stop
   or a time limit must actually complete.
 
+* **The cycle that places an order owns it.** `cancel_unfilled_entries` runs at
+  the end of every live cycle and cancels every entry order still working, so
+  none is ever left resting between cycles: an unfilled entry is a standing
+  instruction priced against quotes the agent can no longer see. Its status is
+  re-read from the broker immediately before the cancel, so a fill landing in
+  that gap is never cancelled out from under its position, and the outcome is
+  read back rather than assumed. Exits are deliberately untouched — a working
+  exit is trying to close risk. The position row behind a cancelled entry is
+  retired as `ENTRY_CANCELLED` with no realized P&L: nothing was ever held.
+
+* **Every re-quote must transmit a different limit price.** The ladder walks the
+  net price in dollars per spread, but the order carries a per-share limit
+  rounded to the cent, so steps narrower than $1.00 of net collapse onto one
+  price. Alpaca refuses a replacement that changes nothing with 422 "order
+  parameters are not changed". Collapsing steps are dropped when the ladder is
+  built — keeping the last of each group, so the walk still ends exactly on the
+  crossing price — and a 422 at run time skips to the next distinct price rather
+  than abandoning the rest of the walk. Any other error still stops it.
+
 * **Multi-leg orders are submitted as a single `mleg` order**, so a long leg can
   never fill without its short leg — the defined-risk guarantee holds at the
   broker, not just in this codebase.
@@ -86,6 +105,13 @@ the store.
   expiry reconstructed from the originating order) so the exit rules manage it;
   a local position the broker does not hold is closed as `RECONCILED_MISSING`.
   Each repair is emitted as its own event.
+
+  A position row is *not* closed as missing while its entry order is still
+  working. The row is written at submission, so an unfilled entry has no broker
+  legs behind it yet — closing it would advance the entry sequence and let the
+  next cycle open a second position in the same underlying if the order then
+  filled. Open **orders** are read alongside positions for exactly this, and a
+  broker that cannot be asked closes nothing.
 
   This exists because of a real failure found by the self-test harness: a submit
   that timed out after Alpaca accepted it left a live spread with no position

@@ -647,6 +647,10 @@ async def run_all(only: int | None = None) -> int:
             outcomes.append(await scenario_8_market_closed())
         if only in (None, 7):
             outcomes.append(await scenario_7_reentry_vs_retry())
+        if only in (None, 10):
+            outcomes.append(await scenario_10_requote_ladder())
+        if only in (None, 11):
+            outcomes.append(await scenario_11_unfilled_entry())
         if only in (None, 6):
             if connected:
                 outcomes.append(await scenario_6_reconcile_recovery(mcp))
@@ -1222,3 +1226,438 @@ async def scenario_9_publish_paths() -> Outcome:
     return Outcome("9 publish paths", all(results),
                    f"{sum(results)}/{len(results)} assertions held; "
                    f"remote received {after3} commit(s)")
+
+
+# ---------------------------------------------------------------------------
+# Scenario 10 — the re-quote ladder survives a 422 no-op
+# ---------------------------------------------------------------------------
+
+
+class NoOpReplaceMCP:
+    """
+    A broker that answers 422 when a replacement changes nothing.
+
+    Alpaca's real behaviour: `replace_order_by_id` with the limit the order
+    already carries is rejected with "order parameters are not changed". The
+    order stays alive and unchanged — it is not an error the ladder should quit
+    on. `reject_limits` forces that answer for chosen limits so the skip path is
+    exercised even after the ladder was made distinct.
+    """
+
+    def __init__(self, reject_limits: tuple[str, ...] = ()) -> None:
+        self.reject_limits = set(reject_limits)
+        self.resting = ""
+        self.transmitted: list[dict] = []
+        self.rejected: list[str] = []
+        self._seq = 0
+
+    def bind_events(self, events): pass
+    def require(self, *t): pass
+    def tool_names(self): return []
+
+    async def call(self, tool: str, arguments: dict | None = None) -> Any:
+        args = arguments or {}
+        if tool == "replace_order_by_id":
+            limit = str(args.get("limit_price"))
+            if limit == self.resting or limit in self.reject_limits:
+                self.rejected.append(limit)
+                raise MCPError(
+                    'HTTP error 422: {"message":"order parameters are not changed"}')
+            self.resting = limit
+            self._seq += 1
+            self.transmitted.append({"tool": tool, "arguments": args})
+            return {"id": f"sim-order-{self._seq}", "status": "new"}
+        if tool == "get_order_by_id":
+            return {"id": args.get("order_id"), "status": "new"}
+        if tool == "get_order_by_client_id":
+            raise MCPError("order not found")
+        return {}
+
+
+async def scenario_10_requote_ladder() -> Outcome:
+    hdr("SCENARIO 10 — RE-QUOTE LADDER: DISTINCT PRICES, 422 NO-OP SKIPS ON")
+    store = test_store("requote")
+    events = EventLog.start(store)
+    executor = Executor(None, None, store, events)
+    results: list[bool] = []
+    notes: list[str] = []
+
+    sub("10a. Every ladder step must transmit a DIFFERENT rounded limit")
+    print(f"  {DIM}net price is carried in dollars per spread but transmitted as a"
+          f" per-share{RESET}")
+    print(f"  {DIM}limit rounded to the cent, so steps under $1.00 of net collapse"
+          f" together.{RESET}\n")
+    geometries = [
+        ("live SPY case (1c of net)", 71.0, 70.0),
+        ("wide spread",               80.0, 68.0),
+        ("uneven walk",               74.5, 70.2),
+        ("3c of net",                 71.0, 68.0),
+        ("sub-cent walk",             71.0, 70.6),
+        ("mid already at cross",      71.0, 71.0),
+    ]
+    for label, mid, cross in geometries:
+        st = _ladder_structure(mid, cross)
+        ladder = executor.requote_ladder(st)
+        limits = [executor._limit_price(p, 1) for p in ladder]
+        resting = executor._limit_price(mid, 1)
+        distinct = len(set(limits)) == len(limits)
+        no_resting = resting not in limits
+        ends_at_cross = (not ladder) or abs(ladder[-1] - cross) < 1e-9
+        ok = distinct and no_resting and ends_at_cross
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} {label:<26} mid {resting} -> "
+              f"{' -> '.join(limits) if limits else '(no distinct step)'}")
+        if not ok:
+            print(f"      distinct={distinct} excludes_resting={no_resting} "
+                  f"ends_at_cross={ends_at_cross}")
+
+    sub("10b. A 422 no-op skips to the next price instead of aborting the ladder")
+    st = _ladder_structure(80.0, 68.0)
+    ladder = executor.requote_ladder(st)
+    doomed = executor._limit_price(ladder[0], 1)
+    print(f"  ladder {[executor._limit_price(p, 1) for p in ladder]}; the broker is "
+          f"forced to answer 422 for {doomed}")
+    sim = NoOpReplaceMCP(reject_limits=(doomed,))
+    sim_exec = Executor(sim, None, store, events)
+    original_wait = EXECUTION.requote_wait_seconds
+    object.__setattr__(EXECUTION, "requote_wait_seconds", 0.01)
+    try:
+        fill = await sim_exec.manage_fill(st, 3, "sim-order-0", "oaa-open-selftest10")
+    finally:
+        object.__setattr__(EXECUTION, "requote_wait_seconds", original_wait)
+
+    sent = [c["arguments"]["limit_price"] for c in sim.transmitted]
+    print(f"  rejected as no-op : {sim.rejected}")
+    print(f"  transmitted       : {sent}")
+    print(f"  result            : requotes={fill['requotes']} "
+          f"final net ${fill['final_price']:.2f} (cross floor "
+          f"${st.credit_at_cross:.2f}) filled={fill['filled']}")
+    remaining = [executor._limit_price(p, 1) for p in ladder[1:]]
+    checks = {
+        "the 422 did not abort the ladder": sent == remaining,
+        "every later step was still transmitted": len(sent) == len(ladder) - 1,
+        "the skipped step is not counted as a re-quote": fill["requotes"] == len(ladder) - 1,
+        "the walk still reached the cross floor":
+            abs(fill["final_price"] - st.credit_at_cross) < 1e-9,
+    }
+    for label, ok in checks.items():
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+    sub("10c. A real failure still stops the ladder")
+
+    class BrokenMCP(NoOpReplaceMCP):
+        async def call(self, tool: str, arguments: dict | None = None) -> Any:
+            if tool == "replace_order_by_id":
+                raise MCPError("HTTP error 403: insufficient buying power")
+            return await NoOpReplaceMCP.call(self, tool, arguments)
+
+    broken = BrokenMCP()
+    object.__setattr__(EXECUTION, "requote_wait_seconds", 0.01)
+    try:
+        broke = await Executor(broken, None, store, events).manage_fill(
+            st, 3, "sim-order-0", "oaa-open-selftest10b")
+    finally:
+        object.__setattr__(EXECUTION, "requote_wait_seconds", original_wait)
+    ok = broke["requotes"] == 0 and not broke["filled"]
+    results.append(ok)
+    print(f"  {'OK ' if ok else 'BAD'} a 403 aborts after {broke['requotes']} "
+          f"re-quote(s) — only the no-op is skipped, not every error")
+
+    sub("10d. Recorded event log")
+    show_events(store, events.cycle_id, (Stage.EXECUTION, Stage.ERROR))
+
+    notes.append(
+        "the live failure was a ladder whose next step rounded to the limit "
+        "already resting: 0 re-quotes were transmitted before the 422 ended the walk")
+    return Outcome("10 re-quote ladder", all(results),
+                   f"{sum(results)}/{len(results)} assertions held; ladder steps are "
+                   f"distinct and a 422 no-op costs one step, not the walk", notes)
+
+
+def _ladder_structure(mid: float, cross: float):
+    """A structure carrying only the two prices the ladder is built from."""
+    from decision.structure import Leg, ProposedStructure
+    from perception.market import OptionContract
+
+    expiry = date(2026, 9, 4)
+    short = OptionContract("SPY260904P00755000", "SPY", expiry, "P", 755.0,
+                           bid=1.00, ask=1.05, delta=-0.28, open_interest=800)
+    long = OptionContract("SPY260904P00750000", "SPY", expiry, "P", 750.0,
+                          bid=0.20, ask=0.25, delta=-0.12, open_interest=700)
+    return ProposedStructure(
+        "SPY", "bull put credit spread", expiry, 3,
+        [Leg(short, "sell", "sell_to_open"), Leg(long, "buy", "buy_to_open")],
+        credit=mid, credit_at_cross=cross, width=5.0, max_loss=420.0, max_profit=mid,
+        breakevens=[754.2], total_spread=0.10, short_delta=0.28,
+        min_open_interest=700, is_credit=True)
+
+
+# ---------------------------------------------------------------------------
+# Scenario 11 — an unfilled entry is cancelled, and never closed while it lives
+# ---------------------------------------------------------------------------
+
+
+class RestingEntryMCP:
+    """
+    Broker where the entry order rests unfilled: accepted, never filled.
+
+    Models the exact live situation. `get_all_positions` stays empty (nothing
+    filled), while `get_orders` keeps returning the working order until it is
+    cancelled — the two readings reconciliation has to combine.
+
+    `fill_on_confirm` makes the order fill at the moment the sweep re-reads its
+    status, which is the race the sweep must not lose.
+    """
+
+    def __init__(self, legs: list[dict], qty: int, limit_price: str,
+                 fill_on_confirm: bool = False, orders_readable: bool = True) -> None:
+        self.legs = legs
+        self.qty = qty
+        self.limit_price = limit_price
+        self.fill_on_confirm = fill_on_confirm
+        self.orders_readable = orders_readable
+        self.orders: dict[str, dict] = {}
+        self.cancels: list[str] = []
+        self.status_reads = 0
+        self._seq = 0
+
+    def bind_events(self, events): pass
+    def require(self, *t): pass
+    def tool_names(self): return []
+
+    def _order(self, coid: str, status: str) -> dict:
+        return {
+            "id": f"sim-broker-{self._seq}", "client_order_id": coid,
+            "status": status, "qty": str(self.qty),
+            "filled_qty": str(self.qty) if status == "filled" else "0",
+            "limit_price": self.limit_price, "order_class": "mleg",
+            "legs": [dict(l) for l in self.legs],
+        }
+
+    async def call(self, tool: str, arguments: dict | None = None) -> Any:
+        args = arguments or {}
+        if tool == "place_option_order":
+            self._seq += 1
+            coid = args["client_order_id"]
+            self.orders[coid] = self._order(coid, "new")
+            return self.orders[coid]
+        if tool == "get_order_by_client_id":
+            coid = args.get("client_order_id")
+            if coid not in self.orders:
+                raise MCPError("order not found")
+            self.status_reads += 1
+            if self.fill_on_confirm and self.orders[coid]["status"] == "new":
+                self.orders[coid] = self._order(coid, "filled")
+            return self.orders[coid]
+        if tool == "get_order_by_id":
+            return next((o for o in self.orders.values()
+                         if o["id"] == args.get("order_id")), {"status": "new"})
+        if tool == "get_orders":
+            if not self.orders_readable:
+                raise MCPError("HTTP error 500: orders unavailable")
+            wanted = args.get("status", "open")
+            out = list(self.orders.values())
+            if wanted == "open":
+                out = [o for o in out if o["status"] in ("new", "accepted",
+                                                         "partially_filled")]
+            return {"orders": out}
+        if tool == "cancel_order_by_id":
+            self.cancels.append(str(args.get("order_id")))
+            for coid, order in self.orders.items():
+                if order["id"] == str(args.get("order_id")) and order["status"] != "filled":
+                    self.orders[coid] = self._order(coid, "canceled")
+            return {}
+        if tool == "get_all_positions":
+            # Nothing ever filled, so the broker holds no legs.
+            return [] if not any(o["status"] == "filled" for o in self.orders.values()) \
+                else [{"symbol": l["symbol"],
+                       "qty": str(self.qty * (-1 if l["side"] == "sell" else 1)),
+                       "side": "short" if l["side"] == "sell" else "long",
+                       "avg_entry_price": "1.00", "asset_class": "us_option"}
+                      for l in self.legs]
+        return {}
+
+
+async def scenario_11_unfilled_entry() -> Outcome:
+    hdr("SCENARIO 11 — AN UNFILLED ENTRY IS CANCELLED, NOT LEFT RESTING")
+    from execution.orders import entry_sequence, structural_key
+    from execution.reconcile import ENTRY_CANCELLED, RECONCILED_MISSING, Reconciler
+
+    store = test_store("unfilled_entry")
+    events = EventLog.start(store)
+    results: list[bool] = []
+    notes: list[str] = []
+
+    st = _reentry_structure()
+    risk = risk_rules.evaluate(
+        structure=st, equity=100_000.0, open_positions=0, same_direction_positions=0,
+        proposed_bias=1, corporate_actions=[], store=store, events=events,
+        today=date(2026, 9, 1))
+    if not risk.approved:
+        return Outcome("11 unfilled entry", None, f"risk gate refused: {risk.reason}")
+
+    sim = RestingEntryMCP([l.to_mcp_leg() for l in st.legs], risk.contracts, "-0.80")
+    executor = Executor(sim, None, store, events)
+    executor.set_market_open(True)
+    structural = structural_key(st.symbol, st.structure, st.expiry, st.legs)
+    coid = client_order_id(f"{structural}#0", OPEN_INTENT, today_et())
+
+    was_dry, was_wait = ENV.dry_run, EXECUTION.requote_wait_seconds
+    object.__setattr__(ENV, "dry_run", False)
+    object.__setattr__(EXECUTION, "requote_wait_seconds", 0.01)
+    try:
+        sub("11a. The entry is placed and rests unfilled")
+        placed = await executor.open_structure(st, risk, today=today_et())
+        order_row = store.get_order(placed.client_order_id)
+        open_rows = store.open_positions()
+        print(f"  client_order_id : {placed.client_order_id}")
+        print(f"  broker status   : {order_row['status']} (never fills)")
+        print(f"  position rows   : {len(open_rows)} OPEN "
+              f"(written at submission, nothing filled behind it)")
+        print(f"  broker positions: {len(await sim.call('get_all_positions'))} option leg(s)")
+        results += [placed.client_order_id == coid, len(open_rows) == 1,
+                    str(order_row["status"]).lower() == "new"]
+
+        sub("11b. THE BUG — reconciliation must NOT close a row whose entry is live")
+        report = await Reconciler(sim, None, store, events).run()
+        print(report.render())
+        still_open = store.open_positions()
+        kept = (len(report.closed_missing) == 0 and len(report.working_entry) == 1
+                and len(still_open) == 1)
+        results += [len(report.closed_missing) == 0, len(report.working_entry) == 1,
+                    len(still_open) == 1]
+        print(f"\n  {'OK ' if kept else 'BAD'} broker holds no legs, but the entry "
+              f"order is still working -> row KEPT")
+        print(f"      {DIM}closing it here is what advanced the entry sequence and "
+              f"let the next cycle open a second position{RESET}")
+        seq_now = entry_sequence(store, structural)
+        results.append(seq_now == 0)
+        print(f"  {'OK ' if seq_now == 0 else 'BAD'} entry sequence still #{seq_now} "
+              f"— a second position in {st.symbol} cannot be opened")
+
+        sub("11c. End-of-cycle sweep cancels the unfilled entry")
+        cancelled = await executor.cancel_unfilled_entries()
+        after_row = store.get_order(coid)
+        position_rows = store.query(
+            "SELECT * FROM positions WHERE entry_order_id=?", (coid,))
+        print(f"  cancel_order_by_id calls : {sim.cancels}")
+        print(f"  order status now         : {after_row['status']}")
+        print(f"  position row             : {position_rows[0]['status']} / "
+              f"{position_rows[0]['exit_reason']}")
+        print(f"  realized_pnl             : {position_rows[0]['realized_pnl']} "
+              f"({DIM}NULL — nothing was ever held{RESET})")
+        checks = {
+            "exactly one cancel was sent": len(sim.cancels) == 1,
+            "it cancelled the entry's broker order": sim.cancels == ["sim-broker-1"],
+            "the sweep reported it": len(cancelled) == 1,
+            "the local order reads canceled":
+                str(after_row["status"]).lower() == "canceled",
+            "the position row is retired as ENTRY_CANCELLED":
+                position_rows[0]["exit_reason"] == ENTRY_CANCELLED,
+            "no P&L was invented": position_rows[0]["realized_pnl"] is None,
+        }
+        for label, ok in checks.items():
+            results.append(ok)
+            print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+        sub("11d. Next cycle can re-price: the sequence advanced, the id is fresh")
+        seq_after = entry_sequence(store, structural)
+        next_coid = client_order_id(f"{structural}#{seq_after}", OPEN_INTENT, today_et())
+        ok = seq_after == 1 and next_coid != coid
+        results.append(ok)
+        print(f"  entry sequence #{seq_now} -> #{seq_after}")
+        print(f"  next client_order_id: {next_coid}")
+        print(f"  {'OK ' if ok else 'BAD'} a fresh entry against fresh quotes no longer "
+              f"collides with the cancelled one")
+
+        sub("11e. Nothing is left working, so a second sweep is a no-op")
+        again = await executor.cancel_unfilled_entries()
+        results.append(len(again) == 0 and len(sim.cancels) == 1)
+        print(f"  {'OK ' if not again else 'BAD'} second sweep cancelled "
+              f"{len(again)} order(s); broker cancel calls still {len(sim.cancels)}")
+
+        sub("11f. A fill that races the cancel must survive it")
+        race_store = test_store("cancel_race")
+        race_events = EventLog.start(race_store)
+        race_risk = risk_rules.evaluate(
+            structure=st, equity=100_000.0, open_positions=0,
+            same_direction_positions=0, proposed_bias=1, corporate_actions=[],
+            store=race_store, events=race_events, today=date(2026, 9, 1))
+        race_sim = RestingEntryMCP([l.to_mcp_leg() for l in st.legs],
+                                   race_risk.contracts, "-0.80", fill_on_confirm=True)
+        race_exec = Executor(race_sim, None, race_store, race_events)
+        race_exec.set_market_open(True)
+        await race_exec.open_structure(st, race_risk, today=today_et())
+        raced = await race_exec.cancel_unfilled_entries()
+        race_positions = race_store.open_positions()
+        checks = {
+            "no cancel was sent for an order that filled": len(race_sim.cancels) == 0,
+            "the sweep cancelled nothing": len(raced) == 0,
+            "the position row is still OPEN": len(race_positions) == 1,
+        }
+        for label, ok in checks.items():
+            results.append(ok)
+            print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+        sub("11g. If open orders cannot be read, nothing is closed as missing")
+        blind_store = test_store("blind_reconcile")
+        blind_events = EventLog.start(blind_store)
+        blind_risk = risk_rules.evaluate(
+            structure=st, equity=100_000.0, open_positions=0,
+            same_direction_positions=0, proposed_bias=1, corporate_actions=[],
+            store=blind_store, events=blind_events, today=date(2026, 9, 1))
+        blind_sim = RestingEntryMCP([l.to_mcp_leg() for l in st.legs],
+                                    blind_risk.contracts, "-0.80", orders_readable=False)
+        blind_exec = Executor(blind_sim, None, blind_store, blind_events)
+        blind_exec.set_market_open(True)
+        await blind_exec.open_structure(st, blind_risk, today=today_et())
+        blind_report = await Reconciler(blind_sim, None, blind_store, blind_events).run()
+        blind_open = blind_store.open_positions()
+        checks = {
+            "no position was closed as missing": len(blind_report.closed_missing) == 0,
+            "the row is still OPEN": len(blind_open) == 1,
+            "the pass recorded why it declined": bool(blind_report.errors),
+        }
+        for label, ok in checks.items():
+            results.append(ok)
+            print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+        sub("11h. A row the broker really has lost is still closed as missing")
+        gone_report = await Reconciler(sim, None, store, events).run()
+        # The only row for this setup is already CLOSED by the sweep, so nothing
+        # is left to close: prove the path still works on a fresh orphan row.
+        store.add_position(
+            position_key=f"{structural}#9", symbol=st.symbol, structure=st.structure,
+            contracts=1, credit=80.0, width=5.0, max_loss=420.0,
+            expiry=st.expiry.isoformat(), dry_run=False,
+            legs=[{"symbol": l.symbol, "side": l.side,
+                   "position_intent": l.position_intent, "ratio_qty": 1,
+                   "strike": l.contract.strike, "right": l.contract.right}
+                  for l in st.legs],
+            entry_order_id="oaa-open-orphaned", detail={"dry_run": False})
+        orphan_report = await Reconciler(sim, None, store, events).run()
+        orphan = store.query("SELECT * FROM positions WHERE position_key=?",
+                             (f"{structural}#9",))[0]
+        ok = (len(orphan_report.closed_missing) == 1
+              and orphan["exit_reason"] == RECONCILED_MISSING)
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} an orphan row with no working order behind "
+              f"it is closed as {orphan['exit_reason']}")
+        print(f"      {DIM}the guard narrows the close-missing rule, it does not "
+              f"disable it{RESET}")
+    finally:
+        object.__setattr__(ENV, "dry_run", was_dry)
+        object.__setattr__(EXECUTION, "requote_wait_seconds", was_wait)
+
+    sub("11i. Recorded event log")
+    show_events(store, events.cycle_id,
+                (Stage.EXECUTION, Stage.POSITION_MANAGEMENT, Stage.ERROR))
+
+    notes.append(
+        "the position row is written at submission, before any fill; that is why "
+        "an unfilled entry has to be cancelled by the cycle that placed it")
+    return Outcome("11 unfilled entry", all(results),
+                   f"{sum(results)}/{len(results)} assertions held; the entry was "
+                   f"cancelled once, never closed while live, and re-entry is clean",
+                   notes)

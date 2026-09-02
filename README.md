@@ -229,8 +229,9 @@ would silently block every real trade with exposure that does not exist.
   cycle, positions and orders are reconciled against Alpaca before any new
   opportunity is evaluated. Untracked broker positions are adopted so the exit
   rules manage them; local positions the broker no longer holds are closed as
-  `RECONCILED_MISSING`. A locally `FAILED` order is re-checked at the broker
-  before being treated as never sent.
+  `RECONCILED_MISSING` — unless their entry order is still working, which is
+  read from the broker's open ORDERS, not just its positions. A locally `FAILED`
+  order is re-checked at the broker before being treated as never sent.
 * **Daily circuit breaker.** All new orders halt after 10 order attempts or 3%
   account drawdown in one day. The halt is recorded as an event and persists for
   the rest of the day.
@@ -291,6 +292,20 @@ the bid-ask is never crossed on entry. If the order does not fill within
 crossing price (shorts at the bid, longs at the ask) over `requote_attempts`
 steps. The crossing price is a floor that is never exceeded, so the agent
 concedes at most the spread. Every re-quote is logged as an event.
+
+Each step must transmit a *different* limit price. The net price is carried in
+dollars per spread but transmitted as a per-share limit rounded to the cent, so
+a walk narrower than $1.00 of net per step collapses onto one price; replacing
+an order with the limit it already carries is refused by Alpaca with 422 "order
+parameters are not changed". Steps that would collapse are dropped (the walk
+still ends exactly on the crossing price), and a 422 no-op skips to the next
+distinct price instead of abandoning the remaining steps.
+
+Any entry still working at the end of the cycle that placed it is **cancelled**.
+An unfilled entry left resting fills later against quotes nothing re-evaluated,
+and its position row — written at submission — would otherwise be closed as
+missing while the order is still live. The next cycle re-prices against fresh
+quotes.
 
 Two values the spec references without a number, chosen here and documented:
 `high_conviction_multiple` (2.0 × the trend threshold, for the depressed-premium
