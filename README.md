@@ -257,7 +257,8 @@ cap or interval is hardcoded anywhere else.
 | Liquidity (check 7) | bid-ask ≤ 25% of credit, OI ≥ 100 per leg |
 | Max loss per trade | 2% of account equity |
 | Max concurrent positions | 4 |
-| Profit target / stop / time exit | 50% of credit / 2× credit / 1 DTE |
+| Profit target / stop | 50% of credit / 2× credit |
+| Expiry handling | held through expiry day, force-closed 15:30 ET (`time_exit_dte = -1`) |
 | WATCH expiry window | 2 scan cycles |
 | Scan interval | 15 minutes open, 15 minutes closed (`closed_market_sleep_minutes`) |
 | Spread width | 5.0 points (see the check 5 / check 7 tradeoff in `config.py`) |
@@ -283,6 +284,29 @@ every session boundary and DTE by a day for part of each evening.
 boundary; that matters because the expiry-day 15:30 close and the 09-04 hard
 close fire on a *scan*, not on a timer. If a cycle overruns its slot the loop
 skips whole intervals rather than firing catch-up scans back to back.
+
+### Exit precedence
+
+Checked in this order by `Executor.exit_trigger`; the first match wins.
+
+| # | Rule | Fires when | Outranks |
+|---|---|---|---|
+| 1 | Hard close | at/after 2026-09-04 15:30 ET | everything, P&L included |
+| 2 | Expiry-day close | 15:30 ET on the position's own expiry date, or any time after it | profit target, stop |
+| 3 | Time exit (DTE) | `dte <= time_exit_dte` | profit target, stop |
+| 4 | Profit target | cost to close ≤ 50% of credit | — |
+| 5 | Stop loss | cost to close ≥ 2× credit | — |
+
+`time_exit_dte` is **-1**, which retires rule 3: a position expiring today reads
+`dte = 0` and is held, managed on its profit target and stop like any other,
+until the 15:30 ET expiry-day flatten takes it. The rule is unreachable at this
+setting by construction — `dte <= -1` means the expiry date has already passed,
+and rule 2 fires for any date before today, so it always gets there first.
+
+These are physically-settled ETF options, so rule 2 is not a P&L judgement: a
+short leg carried through expiry can be assigned, which is why it outranks both
+P&L rules. Rule 1 is the end-of-window backstop and closes everything still open
+regardless of expiry.
 
 ### Order pricing
 

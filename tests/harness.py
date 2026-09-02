@@ -316,9 +316,12 @@ def scenario_2_exits(store: Store) -> Outcome:
         ("profit target just miss","2026-09-04", 501.0,  "2026-09-02 12:00", None),
         ("stop hit",               "2026-09-04", 2000.0, "2026-09-02 12:00", "stop loss"),
         ("stop just miss",         "2026-09-04", 1999.0, "2026-09-02 12:00", None),
-        ("time exit on expiry day","2026-09-03", 800.0,  "2026-09-03 10:00", "time exit"),
+        ("expiry day, at the open", "2026-09-03", 800.0, "2026-09-03 09:35", None),
+        ("expiry day, 15:29",      "2026-09-03", 800.0,  "2026-09-03 15:29", None),
         ("expiry-day 15:30 close", "2026-09-03", 800.0,  "2026-09-03 15:30", "expiry-day close"),
+        ("past its expiry date",   "2026-09-03", 800.0,  "2026-09-04 09:35", "expiry-day close"),
         ("09-04 hard close",       "2026-09-30", 800.0,  "2026-09-04 15:30", "hard deadline"),
+        ("09-04 one minute early", "2026-09-30", 800.0,  "2026-09-04 15:29", None),
         ("no trigger",             "2026-09-04", 800.0,  "2026-09-02 12:00", None),
     ]
     results = []
@@ -338,16 +341,16 @@ def scenario_2_exits(store: Store) -> Outcome:
          "2026-09-03 15:30", "expiry-day close"),
         ("expiry-day close vs stop loss",     "2026-09-03", 2500.0,
          "2026-09-03 15:30", "expiry-day close"),
-        ("expiry-day close vs time exit",     "2026-09-03", 800.0,
-         "2026-09-03 15:30", "expiry-day close"),
         ("hard close vs profit target",       "2026-09-30", 400.0,
          "2026-09-04 15:30", "hard deadline"),
         ("hard close vs expiry-day close",    "2026-09-04", 400.0,
          "2026-09-04 15:30", "hard deadline"),
-        ("time exit vs profit target",        "2026-09-03", 400.0,
-         "2026-09-03 10:00", "time exit"),
-        ("time exit vs stop loss",            "2026-09-03", 2500.0,
-         "2026-09-03 10:00", "time exit"),
+        # time_exit_dte = -1: the DTE rule no longer pre-empts P&L on expiry
+        # day. A position expiring today is managed on its merits until 15:30.
+        ("expiry morning: profit target runs","2026-09-03", 400.0,
+         "2026-09-03 10:00", "profit target"),
+        ("expiry morning: stop runs",         "2026-09-03", 2500.0,
+         "2026-09-03 10:00", "stop loss"),
     ]
     for label, expiry, cost, when, expect in prec:
         reason, _ = executor.exit_trigger(
@@ -356,8 +359,31 @@ def scenario_2_exits(store: Store) -> Outcome:
         results.append(ok)
         print(f"  {'OK ' if ok else 'BAD'} {label:<36} -> {(reason or 'HOLD')[:52]}")
 
+    sub("2c. At time_exit_dte = -1 the DTE rule is unreachable by construction")
+    print(f"  {DIM}dte <= -1 means the expiry date has already passed, and the "
+          f"expiry-day{RESET}")
+    print(f"  {DIM}rule fires for any date before today — it always gets there "
+          f"first.{RESET}")
+    dte_cases = [
+        ("expires today",      "2026-09-03", "2026-09-03 10:00"),
+        ("expired yesterday",  "2026-09-02", "2026-09-03 10:00"),
+        ("expired last week",  "2026-08-28", "2026-09-03 10:00"),
+    ]
+    for label, expiry, when in dte_cases:
+        reason, measures = executor.exit_trigger(
+            synthetic_position(expiry), 800.0, now=at(when))
+        fired = bool(reason and reason.startswith("time exit"))
+        results.append(not fired)
+        where = ("held" if reason is None
+                 else reason.split(":")[0])
+        print(f"  {'OK ' if not fired else 'BAD'} {label:<18} expiry {expiry} @ "
+              f"{when} -> {where} (dte read: "
+              f"{measures.get('dte', 'rule never reached')})")
+
     return Outcome("2 exit triggers", all(results),
-                   f"{sum(results)}/{len(results)} cases behaved as specified")
+                   f"{sum(results)}/{len(results)} cases behaved as specified; "
+                   f"time_exit_dte={RISK.time_exit_dte} defers expiry day to the "
+                   f"{EXPIRY_DAY_CLOSE_TIME:%H:%M} close")
 
 
 # ---------------------------------------------------------------------------
@@ -828,7 +854,10 @@ async def scenario_6_reconcile_recovery(mcp: AlpacaMCP) -> Outcome:
         exit_cases = [
             ("profit target", target - 1.0,  "2026-09-02 12:00", "profit target"),
             ("stop loss",     stop + 1.0,    "2026-09-02 12:00", "stop loss"),
-            ("time exit",     credit * 0.8,  "2026-09-04 10:00", "time exit"),
+            # Expiry 2026-09-04: held through its expiry morning now that
+            # time_exit_dte is -1, then caught by the 09-04 hard close.
+            ("expiry morning", credit * 0.8, "2026-09-04 10:00", None),
+            ("hard close",    credit * 0.8,  "2026-09-04 15:30", "hard deadline"),
             ("no trigger",    credit * 0.8,  "2026-09-02 12:00", None),
         ]
         for label, cost, when, expect in exit_cases:

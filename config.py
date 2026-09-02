@@ -272,10 +272,20 @@ class RiskConfig:
     #: Exit discipline.
     profit_target_pct_of_credit: float = 0.50
     stop_loss_multiple_of_credit: float = 2.0
-    #: Close at this DTE. 0 means positions are closed on expiry day itself
-    #: rather than the day before; with expiry_cutoff 2026-09-04 and min_dte 1,
-    #: a value of 1 would leave Sep 3 with no tradable expiry at all.
-    time_exit_dte: int = 0
+    #: Close at this DTE. -1 retires the DTE rule in favour of
+    #: EXPIRY_DAY_CLOSE_TIME: a position expiring today is held through its
+    #: expiry day and flattened at 15:30 ET, so the profit target and stop still
+    #: govern it all morning instead of a 0-DTE reading closing it at the open.
+    #:
+    #: Nothing can reach this rule at -1. dte <= -1 means the expiry date has
+    #: already passed, and past_expiry_day_close() returns True for any date
+    #: before today — it fires first, ahead of the DTE arithmetic. The rule is
+    #: kept as a floor for a future configuration, not as a live trigger.
+    #:
+    #: The same value gates entry in risk/rules.py ("expiry sanity"): at -1 that
+    #: check no longer refuses a 0-DTE structure. Chain selection is what keeps
+    #: 0-DTE out — UNIVERSE.min_dte = 1 — so that backstop is now single-layered.
+    time_exit_dte: int = -1
     #: Daily circuit breaker.
     max_order_attempts_per_day: int = 10
     max_daily_drawdown_pct: float = 0.03
