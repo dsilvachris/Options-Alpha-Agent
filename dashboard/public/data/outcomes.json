@@ -1,15 +1,57 @@
 {
  "meta": {
-  "generated_at": "2026-09-02T09:56:04.380213-04:00",
-  "generated_at_display": "09:56 EDT",
-  "generated_at_utc": "2026-09-02T13:56:04.380236+00:00",
+  "generated_at": "2026-09-02T11:29:53.927847-04:00",
+  "generated_at_display": "11:29 EDT",
+  "generated_at_utc": "2026-09-02T15:29:53.927959+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
   "dry_run": false
  },
- "realized_pnl": 0,
+ "realized_pnl": 0.0,
  "open_positions": [
+  {
+   "id": 12,
+   "position_key": "QQQ|bull put credit spread|2026-09-03|22edaac2#0",
+   "symbol": "QQQ",
+   "structure": "bull put credit spread",
+   "opened_ts": "2026-09-02T15:29:31+00:00",
+   "closed_ts": null,
+   "status": "OPEN",
+   "contracts": 4,
+   "credit": 304.0,
+   "width": 5.0,
+   "max_loss": 1696.0,
+   "expiry": "2026-09-03",
+   "legs": "[{\"symbol\": \"QQQ260903P00705000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 705.0, \"right\": \"P\"}, {\"symbol\": \"QQQ260903P00700000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 700.0, \"right\": \"P\"}]",
+   "entry_order_id": "oaa-open-bced7b1870b14118c2c0",
+   "exit_order_id": null,
+   "exit_reason": null,
+   "realized_pnl": null,
+   "detail": "{\"dry_run\": false, \"breakevens\": [704.24], \"exit_plan\": {\"profit_target_cost_to_close\": 152.0, \"stop_loss_cost_to_close\": 608.0, \"time_exit_dte\": 0, \"credit_collected\": 304.0}, \"credit_per_contract\": 76.0, \"max_loss_per_contract\": 424.0}",
+   "dry_run": 0
+  },
+  {
+   "id": 11,
+   "position_key": "SPY|bull put credit spread|2026-09-03|556b9137#0",
+   "symbol": "SPY",
+   "structure": "bull put credit spread",
+   "opened_ts": "2026-09-02T15:28:47+00:00",
+   "closed_ts": null,
+   "status": "OPEN",
+   "contracts": 4,
+   "credit": 296.0,
+   "width": 5.0,
+   "max_loss": 1704.0,
+   "expiry": "2026-09-03",
+   "legs": "[{\"symbol\": \"SPY260903P00763000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 763.0, \"right\": \"P\"}, {\"symbol\": \"SPY260903P00758000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 758.0, \"right\": \"P\"}]",
+   "entry_order_id": "oaa-open-72b6945078f765708421",
+   "exit_order_id": null,
+   "exit_reason": null,
+   "realized_pnl": null,
+   "detail": "{\"dry_run\": false, \"breakevens\": [762.26], \"exit_plan\": {\"profit_target_cost_to_close\": 148.0, \"stop_loss_cost_to_close\": 592.0, \"time_exit_dte\": 0, \"credit_collected\": 296.0}, \"credit_per_contract\": 74.0, \"max_loss_per_contract\": 426.0}",
+   "dry_run": 0
+  },
   {
    "id": 10,
    "position_key": "IWM|iron condor|2026-09-03|9d824c1c#0",
@@ -51,15 +93,17 @@
    "realized_pnl": null,
    "detail": "{\"dry_run\": false, \"breakevens\": [700.22, 712.78], \"exit_plan\": {\"profit_target_cost_to_close\": 535.5, \"stop_loss_cost_to_close\": 2142.0, \"time_exit_dte\": 0, \"credit_collected\": 1071.0}, \"credit_per_contract\": 178.5, \"max_loss_per_contract\": 321.5}",
    "dry_run": 0
-  },
+  }
+ ],
+ "closed_positions": [
   {
    "id": 8,
    "position_key": "SPY|bull put credit spread|2026-09-03|862e9f38#0",
    "symbol": "SPY",
    "structure": "bull put credit spread",
    "opened_ts": "2026-09-02T13:50:08+00:00",
-   "closed_ts": null,
-   "status": "OPEN",
+   "closed_ts": "2026-09-02T15:22:12+00:00",
+   "status": "CLOSED",
    "contracts": 4,
    "credit": 286.0,
    "width": 5.0,
@@ -68,14 +112,15 @@
    "legs": "[{\"symbol\": \"SPY260903P00758000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 758.0, \"right\": \"P\"}, {\"symbol\": \"SPY260903P00753000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 753.0, \"right\": \"P\"}]",
    "entry_order_id": "oaa-open-bad2b8c0509ff1b255d7",
    "exit_order_id": null,
-   "exit_reason": null,
+   "exit_reason": "RECONCILED_MISSING",
    "realized_pnl": null,
    "detail": "{\"dry_run\": false, \"breakevens\": [757.28], \"exit_plan\": {\"profit_target_cost_to_close\": 143.0, \"stop_loss_cost_to_close\": 572.0, \"time_exit_dte\": 0, \"credit_collected\": 286.0}, \"credit_per_contract\": 71.5, \"max_loss_per_contract\": 428.5}",
    "dry_run": 0
   }
  ],
- "closed_positions": [],
- "exits_by_reason": {},
+ "exits_by_reason": {
+  "other": 1
+ },
  "equity_curve": [
   {
    "id": 1,
@@ -160,12 +205,19 @@
    "equity": 100000.0,
    "last_equity": 100000.0,
    "cycle_id": "9eef7ae9d33f"
+  },
+  {
+   "id": 13,
+   "ts": "2026-09-02T15:28:45+00:00",
+   "equity": 99795.0,
+   "last_equity": 100000.0,
+   "cycle_id": "30cf4239cc0f"
   }
  ],
- "avg_score_executed": 95.0,
- "n_executed": 12,
- "avg_score_declined": 57.1,
- "n_declined": 26,
+ "avg_score_executed": 95.7,
+ "n_executed": 14,
+ "avg_score_declined": 55.0,
+ "n_declined": 27,
  "dry_run_open": 0,
  "dry_run_closed": 7,
  "dry_run_notional_pnl": 0.0
