@@ -641,6 +641,8 @@ async def run_all(only: int | None = None) -> int:
                 outcomes.append(await scenario_4_idempotency(mcp))
             else:
                 outcomes.append(Outcome("4 idempotency", None, "no MCP session"))
+        if only in (None, 9):
+            outcomes.append(await scenario_9_publish_paths())
         if only in (None, 8):
             outcomes.append(await scenario_8_market_closed())
         if only in (None, 7):
@@ -1095,3 +1097,128 @@ async def scenario_8_market_closed() -> Outcome:
     return Outcome("8 market closed", all(results),
                    f"{sum(results)}/{len(results)} assertions held; broker received "
                    f"{len(mcp.submits)} submit(s) (only the forced flatten)")
+
+
+# ---------------------------------------------------------------------------
+# Scenario 9 — publish paths actually commit and push
+# ---------------------------------------------------------------------------
+
+
+def _make_repo(tag: str) -> tuple[Path, Path]:
+    """A throwaway work tree with a real bare remote, for exercising git."""
+    import shutil
+
+    base = Path(f"/tmp/oaa_git_{tag}")
+    if base.exists():
+        shutil.rmtree(base)
+    remote, work = base / "remote.git", base / "work"
+    remote.mkdir(parents=True)
+    work.mkdir(parents=True)
+    subprocess.run(["git", "init", "--bare", "-b", "main", str(remote)],
+                   capture_output=True, check=True)
+    for cmd in (["git", "init", "-b", "main"],
+                ["git", "config", "user.email", "selftest@example.com"],
+                ["git", "config", "user.name", "OAA Selftest"],
+                ["git", "remote", "add", "origin", str(remote)]):
+        subprocess.run(cmd, cwd=work, capture_output=True, check=True)
+    (work / "seed.txt").write_text("seed\n")
+    subprocess.run(["git", "add", "-A"], cwd=work, capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "seed"], cwd=work, capture_output=True, check=True)
+    subprocess.run(["git", "push", "-u", "origin", "main"], cwd=work,
+                   capture_output=True, check=True)
+    return work, remote
+
+
+def _remote_commits(remote: Path) -> int:
+    out = subprocess.run(["git", "rev-list", "--count", "main"], cwd=remote,
+                         capture_output=True, text=True)
+    return int(out.stdout.strip() or 0)
+
+
+async def scenario_9_publish_paths() -> Outcome:
+    hdr("SCENARIO 9 — PUBLISH ACTUALLY COMMITS AND PUSHES")
+    import cli as cli_mod
+    from dashboard import git_publish
+
+    results: list[bool] = []
+    parser = cli_mod.build_parser()
+
+    sub("9a. Flag resolution — `publish --push` must imply --commit")
+    expectations = [
+        (["publish"], (False, False)),
+        (["publish", "--commit"], (True, False)),
+        (["publish", "--push"], (True, True)),
+        (["publish", "--commit", "--push"], (True, True)),
+    ]
+    for argv, expected in expectations:
+        got = cli_mod.resolve_publish_flags(parser.parse_args(argv))
+        ok = got == expected
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} {' '.join(argv):<28} -> "
+              f"commit={got[0]!s:<5} push={got[1]!s:<5} (expected {expected})")
+
+    sub("9b. Flag resolution — `loop --publish` pushes by default")
+    loop_expectations = [
+        (["loop"], (False, False)),
+        (["loop", "--publish"], (True, True)),
+        (["loop", "--publish", "--no-push"], (True, False)),
+    ]
+    for argv, expected in loop_expectations:
+        got = cli_mod.resolve_loop_publish_flags(parser.parse_args(argv))
+        ok = got == expected
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} {' '.join(argv):<28} -> "
+              f"publish={got[0]!s:<5} push={got[1]!s:<5} (expected {expected})")
+
+    sub("9c. commit_and_push against a real repo with a real remote")
+    work, remote = _make_repo("push")
+    before = _remote_commits(remote)
+    target = work / "data" / "state.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text('{"snapshot": 1}')
+
+    first = git_publish.commit_and_push([target], "snapshot 1", None,
+                                        push=True, repo_root=work)
+    after = _remote_commits(remote)
+    print(f"  committed={first.committed} pushed={first.pushed} — {first.reason}")
+    print(f"  remote commits {before} -> {after}")
+    results += [first.committed, first.pushed, after == before + 1]
+
+    sub("9d. Unchanged snapshot must not produce a commit")
+    second = git_publish.commit_and_push([target], "snapshot 1 again", None,
+                                         push=True, repo_root=work)
+    after2 = _remote_commits(remote)
+    print(f"  committed={second.committed} — {second.reason}")
+    print(f"  remote commits still {after2}")
+    results += [not second.committed, after2 == after]
+
+    sub("9e. A changed snapshot commits and pushes again")
+    target.write_text('{"snapshot": 2}')
+    third = git_publish.commit_and_push([target], "snapshot 2", None,
+                                        push=True, repo_root=work)
+    after3 = _remote_commits(remote)
+    print(f"  committed={third.committed} pushed={third.pushed} — {third.reason}")
+    print(f"  remote commits {after2} -> {after3}")
+    results += [third.committed, third.pushed, after3 == after2 + 1]
+
+    sub("9f. push=False commits locally but leaves the remote untouched")
+    target.write_text('{"snapshot": 3}')
+    fourth = git_publish.commit_and_push([target], "snapshot 3", None,
+                                         push=False, repo_root=work)
+    after4 = _remote_commits(remote)
+    print(f"  committed={fourth.committed} pushed={fourth.pushed} — {fourth.reason}")
+    print(f"  remote commits still {after4} (local commit not pushed)")
+    results += [fourth.committed, not fourth.pushed, after4 == after3]
+
+    sub("9g. A non-repo degrades without raising")
+    plain = Path("/tmp/oaa_git_plain")
+    plain.mkdir(parents=True, exist_ok=True)
+    (plain / "x.json").write_text("{}")
+    none = git_publish.commit_and_push([plain / "x.json"], "no repo", None,
+                                       push=True, repo_root=plain)
+    print(f"  committed={none.committed} — {none.reason}")
+    results += [not none.committed, "not a git repository" in none.reason]
+
+    return Outcome("9 publish paths", all(results),
+                   f"{sum(results)}/{len(results)} assertions held; "
+                   f"remote received {after3} commit(s)")

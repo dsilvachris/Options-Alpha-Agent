@@ -491,7 +491,7 @@ class Agent:
             card = decision_card.declined_card(
                 symbol=symbol, iv_condition=vol.condition, trend_condition=trend.condition,
                 structure=structure.structure, score=score_result.score,
-                reason=score_result.reason,
+                reason=score_result.reason, checks=score_result.checks_dict,
             )
             events.emit(Stage.FINAL_DECISION, f"{symbol}: REJECT — {score_result.reason}",
                         symbol=symbol, payload={"reason": score_result.reason})
@@ -571,6 +571,7 @@ class Agent:
             card = decision_card.declined_card(
                 symbol=symbol, iv_condition=vol.condition, trend_condition=trend.condition,
                 structure=structure.structure, score=score_result.score, reason=reason,
+                checks=score_result.checks_dict,
             )
             events.emit(Stage.FINAL_DECISION, f"{symbol}: REJECT — {reason}",
                         symbol=symbol, payload={"reason": reason})

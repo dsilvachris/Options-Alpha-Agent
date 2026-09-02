@@ -44,11 +44,21 @@ The agent runs locally against SQLite. The hosted site is a **published snapshot
 of what the dashboard reads — the same payload, written to static JSON.
 
 ```bash
-.venv/bin/python cli.py publish            # write dashboard/public/
-.venv/bin/python cli.py publish --commit   # ... and commit if it changed
-.venv/bin/python cli.py publish --push     # ... and push
-.venv/bin/python cli.py loop --publish     # publish after every scan cycle
+.venv/bin/python cli.py publish                  # write dashboard/public/ only
+.venv/bin/python cli.py publish --commit         # ... and commit if it changed
+.venv/bin/python cli.py publish --push           # ... and push (implies --commit)
+.venv/bin/python cli.py loop --publish           # publish + commit + push each cycle
+.venv/bin/python cli.py loop --publish --no-push # commit locally, do not push
 ```
+
+**`loop --publish` pushes by default.** The purpose of publishing every cycle is
+that the hosted dashboard refreshes during the session, and a commit that never
+leaves the machine does not do that. `--no-push` opts out for a local-only run.
+`publish` on its own writes files and stops — it is the one-shot inspection
+command, so committing is opt-in there.
+
+A push only happens when the snapshot's material digest changed, so a quiet
+session produces no commits rather than one per cycle.
 
 ### Deploy steps
 

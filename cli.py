@@ -170,11 +170,12 @@ async def cmd_loop(args: argparse.Namespace) -> int:
     require_credentials()
     print(f"Scanning every {config.LOOP.scan_interval_minutes} minutes "
           f"({config.LOOP.closed_market_sleep_minutes} while closed). Ctrl-C to stop.")
-    if args.publish:
-        print("Publishing a static snapshot after each cycle; committing only on "
-              "a material change.")
+    publish, push = resolve_loop_publish_flags(args)
+    if publish:
+        print(f"Publishing a static snapshot after each cycle; committing only on "
+              f"a material change, and {'pushing' if push else 'NOT pushing (--no-push)'}.")
     async with Agent(echo=True) as agent:
-        await agent.run_forever(publish=args.publish, push=args.push)
+        await agent.run_forever(publish=publish, push=push)
     return 0
 
 
@@ -237,25 +238,33 @@ def cmd_scores(args: argparse.Namespace) -> int:
     rule("CHECK PASS RATES (what is actually gating)")
     passed: Counter = Counter()
     seen: Counter = Counter()
+    skipped: Counter = Counter()
     for decision in decisions:
         try:
             detail = json.loads(decision["detail"] or "{}")
         except (TypeError, ValueError):
             continue
         for check in detail.get("checks", []) or []:
-            seen[check["id"]] += 1
+            cid = check["id"]
+            if not check.get("evaluable", True):
+                skipped[cid] += 1
+                continue
+            seen[cid] += 1
             if check["passed"]:
-                passed[check["id"]] += 1
+                passed[cid] += 1
     if not seen:
         print("No check-level detail recorded.")
     for cid in sorted(CHECK_NAMES):
         total = seen.get(cid, 0)
-        if not total:
+        skip = skipped.get(cid, 0)
+        if not total and not skip:
             continue
         ok = passed.get(cid, 0)
         gate = " [HARD GATE]" if cid in SCORING.hard_gates else ""
+        note = (f"  {AMBER}[{skip} NOT EVALUABLE — excluded from scoring]{RESET}"
+                if skip else "")
         print(f"  #{cid} {CHECK_NAMES[cid]:<22} {ok:>4}/{total:<4} passed"
-              f"  ({SCORING.points[cid]:>2} pts){gate}")
+              f"  ({SCORING.points[cid]:>2} pts){gate}{note}")
 
     rule("PER-CANDIDATE MEASURED VALUES")
     print(f"{DIM}Values behind checks 5, 6 and 7. Thresholds: credit/width >= "
@@ -383,6 +392,32 @@ def cmd_mcp_log(args: argparse.Namespace) -> int:
     return 0
 
 
+def resolve_publish_flags(args: argparse.Namespace) -> tuple[bool, bool]:
+    """
+    Resolve `cli.py publish` flags to (commit, push).
+
+    --push implies --commit: pushing without committing is not something git can
+    do, so asking to push is asking to commit.
+    """
+    push = bool(getattr(args, "push", False))
+    commit = bool(getattr(args, "commit", False)) or push
+    return commit, push
+
+
+def resolve_loop_publish_flags(args: argparse.Namespace) -> tuple[bool, bool]:
+    """
+    Resolve `cli.py loop --publish` flags to (publish, push).
+
+    Pushing is the DEFAULT when publishing in the loop. The point of publishing
+    every cycle is that the hosted dashboard refreshes during the session; a
+    commit that never leaves the machine does not do that. `--no-push` opts out
+    for a local-only run.
+    """
+    publish = bool(getattr(args, "publish", False))
+    push = publish and not bool(getattr(args, "no_push", False))
+    return publish, push
+
+
 def cmd_publish(args: argparse.Namespace) -> int:
     """Export the dashboard as static JSON for hosting."""
     from dashboard import export as export_mod
@@ -409,14 +444,19 @@ def cmd_publish(args: argparse.Namespace) -> int:
                  "files": [str(p.name) for p, _ in result.files]},
     )
 
-    if args.commit:
+    commit, push = resolve_publish_flags(args)
+    if commit:
         rule("GIT")
         git = git_publish.commit_and_push(
             [p for p, _ in result.files],
-            f"dashboard: snapshot {result.generated_at}", events, push=args.push)
+            f"dashboard: snapshot {result.generated_at}", events, push=push)
         print(f"  {git.reason}")
+        if not git.committed and "not a git repository" in git.reason:
+            print(f"  {AMBER}Run `git init` and add a remote to enable publishing "
+                  f"to the hosted dashboard.{RESET}")
     else:
-        print(f"\n{DIM}Not committing (pass --commit to commit, --push to push).{RESET}")
+        print(f"\n{DIM}Not committing (pass --commit to commit, "
+              f"--push to commit and push).{RESET}")
     return 0
 
 
@@ -508,7 +548,8 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The CLI parser, exposed so tests can assert on flag resolution."""
     parser = argparse.ArgumentParser(
         prog="cli.py", description="Options Alpha Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__,
@@ -525,8 +566,9 @@ def main() -> int:
     loop_p.add_argument("--publish", action="store_true",
                         help="publish a static snapshot after each cycle, "
                              "committing only when it materially changed")
-    loop_p.add_argument("--push", action="store_true",
-                        help="also push each publish commit")
+    loop_p.add_argument("--no-push", action="store_true",
+                        help="commit each publish but do not push (default is to "
+                             "push, so the hosted dashboard refreshes)")
     scores = sub.add_parser("scores", help="Section 4.4 score-distribution report")
     scores.add_argument("--all-sessions", action="store_true",
                         help="include decisions made outside market hours")
@@ -553,7 +595,7 @@ def main() -> int:
     publish_p.add_argument("--commit", action="store_true",
                            help="git commit the published files if they changed")
     publish_p.add_argument("--push", action="store_true",
-                           help="also push (implies --commit)")
+                           help="commit and push (implies --commit)")
 
     clear_sim = sub.add_parser(
         "clear-simulated",
@@ -563,13 +605,18 @@ def main() -> int:
 
     selftest = sub.add_parser(
         "selftest", help="dry-run harness for the exit/order/failure paths")
-    selftest.add_argument("--scenario", type=int, default=None, choices=[1, 2, 3, 4, 5, 6, 7, 8],
+    selftest.add_argument("--scenario", type=int, default=None, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9],
                           help="run only one scenario")
 
     dash = sub.add_parser("dashboard", help="serve the dashboard")
     dash.add_argument("--host", default=None)
     dash.add_argument("--port", type=int, default=None)
 
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
 
     sync = {

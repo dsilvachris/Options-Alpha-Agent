@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from config import RISK, SCORING
+from config import RISK, SCORING, SIGNALS
 from decision.matrix import IRON_CONDOR, MatrixResult
 from decision.structure import ProposedStructure
 from signals.trend import TrendReading
@@ -43,6 +43,22 @@ CHECK_NAMES = {
 
 @dataclass
 class Check:
+    """
+    One checklist item, in one of three states.
+
+    passed=True                 the condition was tested and held
+    passed=False, evaluable     the condition was tested and did not hold
+    evaluable=False             the condition COULD NOT BE TESTED — the data
+                                needed to answer it does not exist yet
+
+    The third state exists because a check that cannot be evaluated is not the
+    same as a check that failed. Scoring a missing measurement as a failure
+    penalises a candidate for the agent's own lack of history, which is what
+    check 2 was doing on a fresh store. A non-evaluable check is excluded from
+    both the numerator and the denominator, and the total is rescaled, so the
+    score bands keep meaning the same thing.
+    """
+
     id: int
     name: str
     passed: bool
@@ -50,20 +66,35 @@ class Check:
     threshold: str
     points: int
     hard_gate: bool = False
+    evaluable: bool = True
 
     @property
     def awarded(self) -> int:
-        return self.points if self.passed else 0
+        return self.points if (self.evaluable and self.passed) else 0
+
+    @property
+    def available(self) -> int:
+        """Points this check contributes to the denominator."""
+        return self.points if self.evaluable else 0
+
+    @property
+    def state(self) -> str:
+        if not self.evaluable:
+            return "NOT_EVALUABLE"
+        return "PASS" if self.passed else "FAIL"
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "name": self.name,
             "passed": self.passed,
+            "evaluable": self.evaluable,
+            "state": self.state,
             "measured": self.measured,
             "threshold": self.threshold,
             "points": self.points,
             "awarded": self.awarded,
+            "available": self.available,
             "hard_gate": self.hard_gate,
         }
 
@@ -79,12 +110,26 @@ class PortfolioState:
 
 @dataclass
 class ScoreResult:
+    #: Score on the 0-100 scale the bands are defined against. When a check is
+    #: not evaluable this is the raw score rescaled over the available points.
     score: int
     state: str
     checks: list[Check] = field(default_factory=list)
     failed_hard_gate: Check | None = None
     reason: str = ""
     promoting_condition: str = ""
+    #: Points actually earned, before rescaling.
+    raw_score: int = 0
+    #: Points that were available to earn (100 unless a check was skipped).
+    available_points: int = 100
+
+    @property
+    def rescaled(self) -> bool:
+        return self.available_points != 100
+
+    @property
+    def not_evaluable(self) -> list[Check]:
+        return [c for c in self.checks if not c.evaluable]
 
     @property
     def checks_dict(self) -> list[dict]:
@@ -96,13 +141,18 @@ class ScoreResult:
 
     @property
     def failed(self) -> list[Check]:
-        return [c for c in self.checks if not c.passed]
+        """Checks that were tested and did not hold. Excludes non-evaluable."""
+        return [c for c in self.checks if c.evaluable and not c.passed]
 
     def breakdown(self) -> str:
         """Section 4.5 — full component breakdown of the score."""
-        lines = [f"Opportunity score: {self.score}/100 -> {self.state}"]
+        header = f"Opportunity score: {self.score}/100 -> {self.state}"
+        if self.rescaled:
+            header += (f"  (earned {self.raw_score} of {self.available_points} "
+                       f"available points, rescaled to 100)")
+        lines = [header]
         for check in sorted(self.checks, key=lambda c: c.id):
-            mark = "PASS" if check.passed else "FAIL"
+            mark = check.state
             gate = " [HARD GATE]" if check.hard_gate else ""
             lines.append(
                 f"  #{check.id} {check.name:<22} {mark}  "
@@ -225,18 +275,45 @@ def check_1_premium_rich(vol: VolatilityReading) -> Check:
 
 
 def check_2_volatility_stable(vol: VolatilityReading) -> Check:
+    """
+    Is implied volatility expanding sharply into entry?
+
+    Requires a real trailing average. With one or two prior sessions the
+    "average" is a single day or two of noise, not a stability signal — it
+    cannot answer the question, so the check is marked NOT EVALUABLE and its
+    points leave both the numerator and the denominator rather than failing
+    every candidate for history the agent has not accumulated yet.
+
+    The 1.15 threshold is unchanged; once the required sessions exist the check
+    evaluates normally.
+    """
+    required = SIGNALS.iv_average_window
+
+    if vol.sample_size < required:
+        return Check(
+            2, CHECK_NAMES[2],
+            passed=False,
+            measured=(f"needs {required} sessions, has {vol.sample_size}"),
+            threshold=(f"at least {required} prior sessions of ATM IV, then "
+                       f"ATM IV <= {SCORING.iv_stability_max_ratio} x their average"),
+            points=SCORING.points[2],
+            evaluable=False,
+        )
+
     if vol.iv_change_ratio is None:
-        passed = False
-        measured = (
-            f"no prior ATM IV history for the trailing average "
-            f"(samples: {vol.sample_size})"
+        return Check(
+            2, CHECK_NAMES[2], False,
+            f"{vol.sample_size} prior session(s) recorded but the current ATM IV "
+            "could not be read",
+            f"ATM IV <= {SCORING.iv_stability_max_ratio} x its trailing average",
+            SCORING.points[2],
         )
-    else:
-        passed = vol.iv_change_ratio <= SCORING.iv_stability_max_ratio
-        measured = (
-            f"ATM IV {_fmt(vol.atm_iv)} vs {vol.sample_size}-day average "
-            f"{_fmt(vol.iv_average)} = ratio {_fmt(vol.iv_change_ratio, '.3f')}"
-        )
+
+    passed = vol.iv_change_ratio <= SCORING.iv_stability_max_ratio
+    measured = (
+        f"ATM IV {_fmt(vol.atm_iv)} vs {vol.sample_size}-session average "
+        f"{_fmt(vol.iv_average)} = ratio {_fmt(vol.iv_change_ratio, '.3f')}"
+    )
     return Check(
         2, CHECK_NAMES[2], passed, measured,
         f"ATM IV <= {SCORING.iv_stability_max_ratio} x its trailing average",
@@ -386,6 +463,18 @@ def score(
     ]
     all_checks = sorted(soft + gates, key=lambda c: c.id)
 
+    # A hard gate must be answerable; an unverifiable mandatory condition is a
+    # rejection, never a skip.
+    unverifiable_gate = next((g for g in gates if not g.evaluable), None)
+    if unverifiable_gate is not None:
+        return ScoreResult(
+            score=0, state=REJECT, checks=all_checks,
+            failed_hard_gate=unverifiable_gate,
+            reason=(f"hard gate #{unverifiable_gate.id} {unverifiable_gate.name} "
+                    f"could not be evaluated — {unverifiable_gate.measured}"),
+            raw_score=0, available_points=0,
+        )
+
     failed_gate = next((g for g in gates if not g.passed), None)
     if failed_gate is not None:
         return ScoreResult(
@@ -397,42 +486,70 @@ def score(
                 f"hard gate #{failed_gate.id} {failed_gate.name} failed — "
                 f"{failed_gate.measured}"
             ),
+            raw_score=0,
+            available_points=sum(c.available for c in all_checks),
         )
 
-    total = sum(c.awarded for c in all_checks)
+    raw = sum(c.awarded for c in all_checks)
+    available = sum(c.available for c in all_checks)
+    # Rescale so the bands keep their meaning when a check could not be tested:
+    # 75 earned out of 90 available is the same quality as 83 out of 100.
+    total = round(raw / available * 100) if available else 0
+
+    skipped = [c for c in all_checks if not c.evaluable]
+    suffix = ""
+    if skipped:
+        suffix = (
+            f"; {raw}/{available} available points rescaled to {total}/100"
+            f" (not evaluable: "
+            + ", ".join(f"#{c.id} {c.name}" for c in skipped) + ")"
+        )
 
     if total >= SCORING.trade_band:
-        state, reason = TRADE, f"score {total} is in the execution band (>= {SCORING.trade_band})"
+        state = TRADE
+        reason = f"score {total} is in the execution band (>= {SCORING.trade_band}){suffix}"
     elif total >= SCORING.watch_band:
         state = WATCH
         reason = (
             f"score {total} is in the moderate band "
-            f"({SCORING.watch_band}-{SCORING.trade_band - 1})"
+            f"({SCORING.watch_band}-{SCORING.trade_band - 1}){suffix}"
         )
     else:
         state = REJECT
-        reason = f"score {total} is below the execution threshold ({SCORING.watch_band})"
+        reason = (f"score {total} is below the execution threshold "
+                  f"({SCORING.watch_band}){suffix}")
 
     promoting = ""
     if state == WATCH:
         shortfall = SCORING.trade_band - total
-        candidates = sorted(
-            (c for c in all_checks if not c.passed and c.points >= shortfall),
+        outstanding = [c for c in all_checks if c.evaluable and not c.passed]
+
+        def scaled_with(check: Check) -> int:
+            return round((raw + check.points) / available * 100) if available else 0
+
+        sufficient = sorted(
+            (c for c in outstanding if scaled_with(c) >= SCORING.trade_band),
             key=lambda c: c.points,
         )
-        if candidates:
-            target = candidates[0]
+        if sufficient:
+            target = sufficient[0]
             promoting = (
                 f"check #{target.id} {target.name} must pass "
-                f"(+{target.points} pts, needs {shortfall}) — requires {target.threshold}"
+                f"(+{target.points} raw pts -> score {scaled_with(target)}, "
+                f"needs {shortfall}) — requires {target.threshold}"
             )
-        else:
-            needed = ", ".join(
-                f"#{c.id} {c.name} (+{c.points})" for c in all_checks if not c.passed
-            )
+        elif outstanding:
+            needed = ", ".join(f"#{c.id} {c.name} (+{c.points})" for c in outstanding)
             promoting = (
                 f"needs {shortfall} more points; no single check suffices — "
                 f"outstanding: {needed}"
+            )
+        else:
+            # Everything testable passed; only non-evaluable checks remain.
+            waiting = ", ".join(f"#{c.id} {c.name} ({c.measured})" for c in skipped)
+            promoting = (
+                f"every evaluable check passed; needs {shortfall} more points, "
+                f"available only once {waiting} can be evaluated"
             )
 
     return ScoreResult(
@@ -441,4 +558,6 @@ def score(
         checks=all_checks,
         reason=reason,
         promoting_condition=promoting,
+        raw_score=raw,
+        available_points=available,
     )

@@ -11,14 +11,43 @@ from __future__ import annotations
 from typing import Any
 
 
+def _evaluable(check: dict) -> bool:
+    """Older recorded checks predate the tri-state and are all evaluable."""
+    return check.get("evaluable", True)
+
+
 def _fmt_checks_passed(checks: list[dict]) -> str:
-    passed = [f"#{c['id']} {c['name']}" for c in checks if c["passed"]]
+    passed = [f"#{c['id']} {c['name']}" for c in checks
+              if _evaluable(c) and c["passed"]]
     return ", ".join(passed) if passed else "none"
 
 
 def _fmt_checks_failed(checks: list[dict]) -> str:
-    failed = [f"#{c['id']} {c['name']} ({c['measured']})" for c in checks if not c["passed"]]
+    failed = [f"#{c['id']} {c['name']} ({c['measured']})" for c in checks
+              if _evaluable(c) and not c["passed"]]
     return "; ".join(failed) if failed else "none"
+
+
+def _fmt_checks_not_evaluable(checks: list[dict]) -> str:
+    """
+    Non-evaluable checks are stated on the card, never omitted.
+
+    A check excluded from the score has to be visible, or the reader cannot tell
+    a 100 earned on nine checks from a 100 earned on eight.
+    """
+    skipped = [f"#{c['id']} {c['name']} — NOT EVALUABLE ({c['measured']})"
+               for c in checks if not _evaluable(c)]
+    return "; ".join(skipped)
+
+
+def _score_line(score: int, checks: list[dict]) -> str:
+    """Score line, showing the rescale whenever a check was skipped."""
+    available = sum(c.get("available", c["points"]) for c in checks)
+    earned = sum(c["awarded"] for c in checks)
+    if available and available != 100:
+        return (f"Opportunity Score: {score}/100 "
+                f"({earned} of {available} available points, rescaled)")
+    return f"Opportunity Score: {score}/100"
 
 
 def trade_card(
@@ -44,9 +73,11 @@ def trade_card(
         f"Underlying: {symbol}\n"
         f"Market Regime: {iv_condition}, {trend_condition}\n"
         f"Selected Strategy: {structure}\n"
-        f"Opportunity Score: {score}/100 — checks passed: {_fmt_checks_passed(checks)}; "
+        f"{_score_line(score, checks)} — checks passed: {_fmt_checks_passed(checks)}; "
         f"failed: {_fmt_checks_failed(checks)}\n"
-        f"Position: credit received ${credit:.2f} x {contracts} contract(s), "
+        + (f"Not evaluated: {_fmt_checks_not_evaluable(checks)}\n"
+           if _fmt_checks_not_evaluable(checks) else "")
+        + f"Position: credit received ${credit:.2f} x {contracts} contract(s), "
         f"spread width ${width:.2f}, breakeven ${breakeven:.2f}, "
         f"maximum loss ${max_loss:.2f}, {dte} days to expiry\n"
         f"Risk Gate: approved — maximum loss ${max_loss:.2f} within the per-trade cap "
@@ -63,14 +94,26 @@ def declined_card(
     structure: str,
     score: int,
     reason: str,
+    checks: list[dict] | None = None,
 ) -> str:
-    """Section 7.2 — Template: Opportunity Declined."""
+    """
+    Section 7.2 — Template: Opportunity Declined.
+
+    `checks` is optional and additive: the spec's template carries only the score
+    and the rejection reason, but a score computed over fewer than 100 available
+    points must say so on the card. Hiding a rescale would make an 83 earned on
+    eight checks indistinguishable from an 83 earned on nine.
+    """
+    checks = checks or []
+    skipped = _fmt_checks_not_evaluable(checks) if checks else ""
     return (
         f"Underlying: {symbol}\n"
         f"Market Regime: {iv_condition}, {trend_condition}\n"
         f"Selected Strategy: {structure}\n"
-        f"Opportunity Score: {score}/100\n"
-        f"Reason for rejection: {reason}\n"
+        + (f"{_score_line(score, checks)}\n" if checks
+           else f"Opportunity Score: {score}/100\n")
+        + (f"Not evaluated: {skipped}\n" if skipped else "")
+        + f"Reason for rejection: {reason}\n"
         f"Final Decision: NO TRADE"
     )
 
@@ -98,8 +141,10 @@ def watch_card(
         f"Underlying: {symbol}\n"
         f"Market Regime: {iv_condition}, {trend_condition}\n"
         f"Selected Strategy: {structure}\n"
-        f"Opportunity Score: {score}/100 — failed: {_fmt_checks_failed(checks)}\n"
-        f"Promoting condition: {promoting_condition}\n"
+        f"{_score_line(score, checks)} — failed: {_fmt_checks_failed(checks)}\n"
+        + (f"Not evaluated: {_fmt_checks_not_evaluable(checks)}\n"
+           if _fmt_checks_not_evaluable(checks) else "")
+        + f"Promoting condition: {promoting_condition}\n"
         f"Watch age: cycle {cycles_seen} of {expires_after_cycle}\n"
         f"Final Decision: WATCH"
     )

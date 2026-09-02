@@ -108,7 +108,7 @@ The matrix determines **eligibility only**. It does not authorize a trade.
 | # | Check | Points | |
 |---|---|---|---|
 | 1 | Premium rich — ATM IV ≥ 1.2 × 20-day realized vol | 15 | |
-| 2 | Volatility stable — ATM IV ≤ 1.15 × its 3-day average | 10 | |
+| 2 | Volatility stable — ATM IV ≤ 1.15 × its 3-session average | 10 | tri-state |
 | 3 | Trend clarity — MA separation > 0.5% of price | 15 | |
 | 4 | Directional agreement — structure bias matches trend | 10 | |
 | 5 | Credit quality — credit / width ≥ 0.30 | 15 | |
@@ -120,6 +120,12 @@ The matrix determines **eligibility only**. It does not authorize a trade.
 Hard gates are evaluated **first** and short-circuit: failing any one rejects the
 opportunity outright, before the score sum is ever reached. Bands: **≥80 TRADE**,
 **60–79 WATCH**, **<60 REJECT**.
+
+Checks are tri-state: passed, failed, or **not evaluable**. Check 2 needs three
+prior sessions of ATM IV before its trailing average means anything; until then
+its 10 points leave both the numerator and the denominator and the score is
+rescaled over the available points, so the bands keep their meaning. Every card
+states which checks were skipped and that the score was rescaled.
 
 ---
 
@@ -174,7 +180,8 @@ All commands use `.venv/bin/python` explicitly — no activated shell is assumed
 .venv/bin/python cli.py config        # active configuration
 .venv/bin/python cli.py dashboard     # financial-terminal dashboard on :8787
 .venv/bin/python cli.py publish       # export the dashboard as static JSON (Vercel)
-.venv/bin/python cli.py loop --publish  # scan continuously, publishing each cycle
+.venv/bin/python cli.py publish --push  # ... and commit + push it (implies --commit)
+.venv/bin/python cli.py loop --publish  # scan continuously; publish, commit and push each cycle
 ```
 
 Going live is a deliberate, explicit act:

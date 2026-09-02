@@ -38,10 +38,36 @@ met (Section 4.5). Points total exactly 100.
   sum is never computed. The soft checks are still *recorded* so the decision
   card explains the full picture, but they contribute no points.
 
-* **Check 2 fails when there is no IV history.** With no prior observations the
-  stability of IV cannot be verified, so the check fails with the sample size
-  recorded. The first session therefore caps at 90/100 — still inside the TRADE
-  band, but never passing a check that was not actually tested.
+* **Check 2 is NOT EVALUABLE until it has real history — not failed.** Checks are
+  tri-state: passed, failed, or not evaluable. A check needs
+  `SIGNALS.iv_average_window` (3) prior sessions of ATM IV before its "trailing
+  average" means anything; with one prior day the average is a single day of
+  noise, which is not a volatility-stability signal. Scoring that as a failure
+  penalised every candidate for history the agent had not accumulated yet.
+
+  When fewer than 3 sessions exist the check's 10 points leave **both** the
+  numerator and the denominator, and the score is rescaled over the available
+  points so the bands keep their meaning: 75 earned of 90 available is the same
+  quality as 83 of 100. The 1.15 threshold is untouched; once 3 sessions exist
+  the check evaluates normally.
+
+  ```
+  sessions  check2           raw  avail  score   band
+  0         NOT_EVALUABLE     90     90    100   TRADE
+  1         NOT_EVALUABLE     90     90    100   TRADE
+  2         NOT_EVALUABLE     90     90    100   TRADE
+  3         PASS             100    100    100   TRADE
+  ```
+
+  It is stated on every decision card — `Not evaluated: #2 volatility stable —
+  NOT EVALUABLE (needs 3 sessions, has 1)` — alongside the rescale, because an
+  83 earned on eight checks must be distinguishable from an 83 earned on nine.
+  The activity ledger counts non-evaluable checks separately so they never
+  distort the most-failed ranking.
+
+* **A hard gate that cannot be evaluated is a rejection, not a skip.** Gates 7,
+  8 and 9 are mandatory; an unverifiable mandatory condition rejects the
+  opportunity rather than dropping out of the denominator.
 
 * **Check 8 is honest about the earnings gap.** Alpaca's MCP server exposes
   corporate action announcements (dividend, split, merger, spinoff, reorg) but

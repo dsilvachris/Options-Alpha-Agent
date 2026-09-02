@@ -25,6 +25,7 @@ class ActivityLedger:
     decisions_by_state: dict[str, int] = field(default_factory=dict)
     rejection_reasons: list[tuple[str, int]] = field(default_factory=list)
     failed_checks: list[tuple[str, int]] = field(default_factory=list)
+    not_evaluable_checks: list[tuple[str, int]] = field(default_factory=list)
     watch_promotions: list[dict] = field(default_factory=list)
     total_decisions: int = 0
     #: Section 4.4 context — out-of-session decisions are priced off wide
@@ -39,6 +40,8 @@ class ActivityLedger:
             "decisions_by_state": self.decisions_by_state,
             "rejection_reasons": [{"reason": r, "count": c} for r, c in self.rejection_reasons],
             "failed_checks": [{"check": c, "count": n} for c, n in self.failed_checks],
+            "not_evaluable_checks": [{"check": c, "count": n}
+                                     for c, n in self.not_evaluable_checks],
             "watch_promotions": self.watch_promotions,
             "total_decisions": self.total_decisions,
             "session_only": self.session_only,
@@ -73,6 +76,12 @@ class ActivityLedger:
         if not self.failed_checks:
             lines.append("  (none)")
         for check, count in self.failed_checks:
+            lines.append(f"  {count:>4}  {check}")
+        lines.append("")
+        lines.append("Checks not evaluable (excluded from scoring, not failures):")
+        if not self.not_evaluable_checks:
+            lines.append("  (none)")
+        for check, count in self.not_evaluable_checks:
             lines.append(f"  {count:>4}  {check}")
         lines.append("")
         lines.append("WATCH items promoted to TRADE:")
@@ -128,6 +137,7 @@ def build(store: Store, session_only: bool = True) -> ActivityLedger:
     )
 
     failed = Counter()
+    not_evaluable = Counter()
     for decision in decisions:
         detail = decision.get("detail")
         if not detail:
@@ -137,8 +147,13 @@ def build(store: Store, session_only: bool = True) -> ActivityLedger:
         except (TypeError, ValueError):
             continue
         for check in parsed.get("checks", []) or []:
-            if not check.get("passed"):
-                failed[f"#{check['id']} {check['name']}"] += 1
+            label = f"#{check['id']} {check['name']}"
+            # A check that could not be evaluated is not a failing check; it is
+            # counted separately so it never distorts the failure ranking.
+            if not check.get("evaluable", True):
+                not_evaluable[label] += 1
+            elif not check.get("passed"):
+                failed[label] += 1
 
     promotions = [
         item for item in store.all_watch_items(limit=500)
@@ -150,6 +165,7 @@ def build(store: Store, session_only: bool = True) -> ActivityLedger:
         decisions_by_state=dict(by_state),
         rejection_reasons=rejections.most_common(),
         failed_checks=failed.most_common(),
+        not_evaluable_checks=not_evaluable.most_common(),
         watch_promotions=promotions,
         total_decisions=len(decisions),
         session_only=session_only,

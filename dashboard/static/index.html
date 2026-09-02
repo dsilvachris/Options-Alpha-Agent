@@ -81,7 +81,7 @@ tr.simrow td{opacity:.72}
 .checks{margin-top:5px;border-top:1px dashed var(--line);padding-top:4px}
 .chk{display:flex;gap:8px;font-size:10.5px;padding:1px 0}
 .chk .st{width:34px}
-.ok{color:var(--green)}.no{color:var(--red)}
+.ok{color:var(--green)}.no{color:var(--red)}.na{color:var(--violet)}
 .gate{color:var(--violet)}
 .empty{color:var(--dim);padding:14px;text-align:center;font-style:italic}
 svg{display:block;width:100%;height:auto}
@@ -273,10 +273,15 @@ function chart(e){
 function cards(rows){
   if(!rows.length) return $("cards").innerHTML = empty("no decisions recorded yet");
   $("cards").innerHTML = rows.map(d=>{
-    const checks = (d.detail && d.detail.checks) ? `<div class="checks">` + d.detail.checks.map(c=>
-      `<div class="chk"><span class="st ${c.passed?'ok':'no'}">${c.passed?'PASS':'FAIL'}</span>
+    const checks = (d.detail && d.detail.checks) ? `<div class="checks">` + d.detail.checks.map(c=>{
+      // Tri-state: a check that could not be evaluated is not a failure.
+      const ev = c.evaluable !== false;
+      const cls = !ev ? "na" : (c.passed ? "ok" : "no");
+      const txt = !ev ? "N/A " : (c.passed ? "PASS" : "FAIL");
+      return `<div class="chk"><span class="st ${cls}">${txt}</span>
        <span>#${c.id} ${esc(c.name)}${c.hard_gate?' <span class="gate">[GATE]</span>':''}
-       <span class="dim">— ${esc(c.measured)}</span></span></div>`).join("") + `</div>` : "";
+       ${!ev?'<span class="na">NOT EVALUABLE</span>':''}
+       <span class="dim">— ${esc(c.measured)}</span></span></div>`;}).join("") + `</div>` : "";
     return `<div class="card s-${esc(d.state)}">
       <div class="meta">${esc(stamp(d.ts))} · cycle ${esc(d.cycle_id||"—")} ·
         <span class="badge b-${esc(d.state)}">${esc(d.state)}</span>
