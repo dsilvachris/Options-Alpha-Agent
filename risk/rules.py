@@ -26,7 +26,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from config import HARD_CLOSE_AT, RISK, past_hard_close, today_et
+from config import (EXPIRY_DAY_CLOSE_TIME, HARD_CLOSE_AT, RISK, UNIVERSE,
+                    past_hard_close, today_et)
 from decision.structure import ProposedStructure
 from logging.events import EventLog, Stage
 from logging.store import Store
@@ -50,17 +51,27 @@ class ExitPlan:
         return {
             "profit_target_cost_to_close": round(self.profit_target_credit, 2),
             "stop_loss_cost_to_close": round(self.stop_loss_credit, 2),
+            # Kept so exit plans stored before the rename still parse. It is
+            # the configured DTE floor, not a rule that can fire at -1.
             "time_exit_dte": self.time_exit_dte,
+            "expiry_day_close_et": f"{EXPIRY_DAY_CLOSE_TIME:%H:%M} ET",
             "credit_collected": round(self.credit_collected, 2),
         }
 
     def describe(self) -> str:
+        """
+        The plan as a judge reads it on a decision card.
+
+        The third clause names the rule that actually flattens the position: the
+        expiry-day close. The DTE rule it used to name cannot fire at
+        time_exit_dte = -1, so printing "-1 DTE" described nothing.
+        """
         return (
             f"take profit at {RISK.profit_target_pct_of_credit:.0%} of credit "
             f"(close <= ${self.profit_target_credit:.2f}), "
             f"stop at {RISK.stop_loss_multiple_of_credit:g}x credit "
             f"(close >= ${self.stop_loss_credit:.2f}), "
-            f"time exit at {self.time_exit_dte} DTE"
+            f"flatten at {EXPIRY_DAY_CLOSE_TIME:%H:%M} ET on the expiry date"
         )
 
 
@@ -241,10 +252,15 @@ def evaluate(
         )
 
     # -- expiry sanity -----------------------------------------------------
-    if structure.dte <= RISK.time_exit_dte:
+    # Pinned to the DTE floor of the tradable window, not to RISK.time_exit_dte.
+    # The exit constant is -1, which can no longer refuse anything, so this gate
+    # would have been dead weight tracking it. Chain selection already filters on
+    # UNIVERSE.min_dte; this is the second layer, checking the structure that was
+    # actually built rather than the contracts it was built from.
+    if structure.dte < UNIVERSE.min_dte:
         reasons.append(
-            f"expiry: {structure.dte} DTE is at or inside the time-based exit "
-            f"({RISK.time_exit_dte} DTE)"
+            f"expiry: {structure.dte} DTE is inside the {UNIVERSE.min_dte} DTE "
+            f"floor of the tradable expiry window"
         )
 
     approved = not reasons

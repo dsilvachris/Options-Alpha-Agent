@@ -20,8 +20,11 @@ counts, the proposed directional bias, and the underlying's corporate actions.
 
 * `RiskDecision` — approved or refused, the number of contracts, total max loss,
   the per-trade cap, every refusal reason, and the `ExitPlan`.
-* `ExitPlan` — profit target, stop loss and time exit, all as absolute
-  cost-to-close dollar levels, stored with the position.
+* `ExitPlan` — profit target and stop loss as absolute cost-to-close dollar
+  levels, plus the 15:30 ET expiry-day flatten, stored with the position. The
+  plan names the expiry-day close rather than a DTE: at `time_exit_dte = -1` the
+  DTE rule cannot fire, so the 15:30 close is what actually flattens a position
+  held to its expiry.
 * Circuit breaker halt events.
 
 ## Constraints enforced
@@ -32,7 +35,8 @@ counts, the proposed directional bias, and the underlying's corporate actions.
 | Portfolio limits | ≤ 4 concurrent open positions |
 | Directional exposure | ≤ 3 open positions sharing a directional bias |
 | Event avoidance | No new position with a scheduled event before expiry |
-| Exit discipline | Close at 50% of credit, 2× credit, or 1 DTE |
+| Exit discipline | Close at 50% of credit, 2× credit, or 15:30 ET on the expiry date |
+| Expiry sanity | Refuse a structure inside the `UNIVERSE.min_dte` (1 DTE) floor |
 | Circuit breaker | Halt after 10 order attempts or 3% daily drawdown |
 
 ## Non-obvious decisions

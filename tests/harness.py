@@ -380,6 +380,45 @@ def scenario_2_exits(store: Store) -> Outcome:
               f"{when} -> {where} (dte read: "
               f"{measures.get('dte', 'rule never reached')})")
 
+    sub("2d. What the judges read: the plan names the rule that actually fires")
+    from risk.rules import build_exit_plan
+
+    plan = build_exit_plan(_ladder_structure(80.0, 75.0), 3)
+    text = plan.describe()
+    print(f"  {text}")
+    rendered = plan.to_dict()
+    checks = {
+        "no dead '-1 DTE' clause on the card": "DTE" not in text,
+        "it names the expiry-day close":
+            f"{EXPIRY_DAY_CLOSE_TIME:%H:%M} ET" in text,
+        "the dashboard column has a value to render":
+            rendered.get("expiry_day_close_et") == f"{EXPIRY_DAY_CLOSE_TIME:%H:%M} ET",
+        "the old key survives for plans stored before the rename":
+            "time_exit_dte" in rendered,
+    }
+    for label, ok in checks.items():
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} {label}")
+
+    sub("2e. The entry gate still refuses an expiry inside the DTE floor")
+    print(f"  {DIM}pinned to UNIVERSE.min_dte={UNIVERSE.min_dte}, not to "
+          f"time_exit_dte={RISK.time_exit_dte}, which can refuse nothing{RESET}")
+    gate_store = test_store("expiry_gate")
+    gate_events = EventLog.start(gate_store)
+    for dte, should_approve in ((0, False), (UNIVERSE.min_dte, True)):
+        st = _ladder_structure(80.0, 75.0)
+        object.__setattr__(st, "dte", dte)
+        object.__setattr__(st, "expiry", today_et() + timedelta(days=dte))
+        decision = risk_rules.evaluate(
+            structure=st, equity=100_000.0, open_positions=0,
+            same_direction_positions=0, proposed_bias=1, corporate_actions=[],
+            store=gate_store, events=gate_events, today=today_et())
+        expiry_refusal = [r for r in decision.reasons if r.startswith("expiry:")]
+        ok = (not expiry_refusal) if should_approve else bool(expiry_refusal)
+        results.append(ok)
+        print(f"  {'OK ' if ok else 'BAD'} {dte} DTE -> "
+              f"{expiry_refusal[0] if expiry_refusal else 'no expiry refusal'}")
+
     return Outcome("2 exit triggers", all(results),
                    f"{sum(results)}/{len(results)} cases behaved as specified; "
                    f"time_exit_dte={RISK.time_exit_dte} defers expiry day to the "

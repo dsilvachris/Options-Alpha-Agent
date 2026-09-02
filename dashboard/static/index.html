@@ -229,7 +229,7 @@ function positions(p){
       <td>${esc(r.structure)}</td><td class="num">${r.contracts}</td>
       <td class="num green">${money(r.credit)}</td><td class="num red">${money(r.max_loss)}</td>
       <td class="dim">${esc(r.expiry)}</td>
-      <td class="dim">${r.exit_plan?`tp ${money(r.exit_plan.profit_target_cost_to_close)} / sl ${money(r.exit_plan.stop_loss_cost_to_close)} / ${r.exit_plan.time_exit_dte}dte`:"—"}</td>
+      <td class="dim">${r.exit_plan?`tp ${money(r.exit_plan.profit_target_cost_to_close)} / sl ${money(r.exit_plan.stop_loss_cost_to_close)} / flat ${esc(r.exit_plan.expiry_day_close_et||"15:30 ET")}`:"—"}</td>
     </tr>`).join("") + `</tbody></table>`;
 }
 
