@@ -38,6 +38,75 @@ A financial-terminal interface over recorded backend state.
 `/api/mcp`, `/api/decisions`, `/api/positions`, `/api/monitoring` are also
 available individually.
 
+## Hosting on Vercel (static snapshot)
+
+The agent runs locally against SQLite. The hosted site is a **published snapshot**
+of what the dashboard reads — the same payload, written to static JSON.
+
+```bash
+.venv/bin/python cli.py publish            # write dashboard/public/
+.venv/bin/python cli.py publish --commit   # ... and commit if it changed
+.venv/bin/python cli.py publish --push     # ... and push
+.venv/bin/python cli.py loop --publish     # publish after every scan cycle
+```
+
+### Deploy steps
+
+1. `git init` the repository and add a remote (the publish path degrades
+   gracefully without one, writing files but committing nothing).
+2. Import the repo at [vercel.com/new](https://vercel.com/new).
+3. Framework preset **Other**; no build command, no install command. The root
+   `vercel.json` already sets `outputDirectory` to `dashboard/public`.
+4. Deploy. Every pushed snapshot triggers a redeploy.
+
+`vercel.json` exists in two places on purpose: the repo root drives the build
+(`outputDirectory`), and a copy is written into `dashboard/public/` so the
+directory also deploys standalone if you point Vercel's root directory at it.
+
+### Files written
+
+| File | Contents |
+|---|---|
+| `data/state.json` | The complete payload — identical in shape to `GET /api/state` |
+| `data/decisions.json` | Decision cards and WATCH items |
+| `data/positions.json` | Open and closed positions |
+| `data/equity.json` | Equity curve and baselines |
+| `data/ledger.json`, `outcomes.json`, `baselines.json` | Section 8 monitoring |
+| `data/mcp.json` | MCP call log |
+| `data/regimes.json` | Per-underlying volatility and trend readings |
+| `data/pipeline.json` | Decision pipeline and recent cycles |
+| `data/index.json` | Manifest, digest and generation metadata |
+| `index.html`, `config.js`, `vercel.json` | The site itself |
+
+### Dual mode — one UI, two data sources
+
+`index.html` is shared byte-for-byte between local and hosted. It loads
+`config.js`, which sets the data source:
+
+| Mode | `config.js` served by | Data source | Poll |
+|---|---|---|---|
+| live | the local FastAPI server | `/api/state` (SQLite, current) | 5s |
+| static | the published copy | `./data/state.json` | 60s, age only |
+
+There is no second UI and no build step — the dashboard is vanilla JS, so what
+Vercel serves is exactly what runs locally.
+
+**Snapshot age is shown prominently.** In static mode the header carries a
+`PUBLISHED SNAPSHOT` chip and an age chip reading *"SNAPSHOT as of 07:13 ET ·
+24 min ago"*, green under 20 minutes, amber under 90, and red and pulsing beyond
+that. In live mode it reads `LIVE`. A stale snapshot can never be mistaken for
+live data.
+
+### Redaction
+
+`dashboard/public/` is committed to a public repository, so `assert_clean()` runs
+over the serialized payload **before anything is written** and raises
+`RedactionError` — aborting the publish entirely — if it finds the API key or
+secret from the environment, a `PK`/`AK` key id, a `PA` account-number token, or
+any of `account_number`, `account_id`, `api_key`, `secret_key` and friends
+carrying a real value. Failures report a masked prefix (`PKRT...26 chars`) rather
+than echoing the credential into a terminal or CI log.
+
 ## Non-obvious decisions
 
 * **Simulated positions are visibly labelled and excluded from money.** Rows

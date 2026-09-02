@@ -658,8 +658,50 @@ class Agent:
             proposed_bias=proposed_bias,
         )
 
+    # -- publishing --------------------------------------------------------
+    _last_publish_digest: str | None = None
+
+    async def _publish_snapshot(self, push: bool) -> None:
+        """
+        Write the static snapshot; commit only on a material change.
+
+        Never raises into the scan loop: a publishing failure must not stop the
+        agent from trading.
+        """
+        from dashboard import export as export_mod
+        from dashboard import git_publish
+
+        events = EventLog.start(self.store, echo=self.echo)
+        try:
+            result = export_mod.publish(self.store, previous_digest=self._last_publish_digest)
+        except export_mod.RedactionError as exc:
+            events.error(f"PUBLISH BLOCKED — {exc}")
+            return
+        except Exception as exc:  # noqa: BLE001 - publishing must not kill the loop
+            events.error(f"Publish failed: {type(exc).__name__}: {exc}")
+            return
+
+        if not result.changed:
+            events.emit(
+                Stage.EXECUTION,
+                "Publish skipped — snapshot unchanged since the last commit",
+                payload={"digest": result.digest[:12]},
+            )
+            return
+
+        self._last_publish_digest = result.digest
+        events.emit(
+            Stage.EXECUTION,
+            f"Published static snapshot ({len(result.files)} files, digest "
+            f"{result.digest[:12]})",
+            payload={"digest": result.digest, "generated_at": result.generated_at},
+        )
+        git_publish.commit_and_push(
+            [p for p, _ in result.files],
+            f"dashboard: snapshot {result.generated_at}", events, push=push)
+
     # -- continuous loop ---------------------------------------------------
-    async def run_forever(self) -> None:
+    async def run_forever(self, publish: bool = False, push: bool = False) -> None:
         """
         Unattended scan loop, on a monotonic schedule.
 
@@ -672,6 +714,10 @@ class Agent:
         and never land on a boundary. That matters because the expiry-day 15:30
         close and the 09-04 hard close fire on a *scan*, not on a timer: a
         drifted loop reaches them late.
+
+        With `publish=True` a static dashboard snapshot is written after every
+        cycle, but committed only when its material digest changed — a scan every
+        15 minutes would otherwise produce ~26 near-identical commits a session.
 
         The interval itself depends on the session — LOOP.scan_interval_minutes
         while open, LOOP.closed_market_sleep_minutes while closed.
@@ -692,6 +738,9 @@ class Agent:
             except Exception as exc:  # noqa: BLE001 - the loop must survive
                 self.store.add_event(Stage.ERROR, f"Loop iteration failed: {exc}")
                 print(f"[loop] error: {exc}")
+
+            if publish:
+                await self._publish_snapshot(push)
 
             interval = LOOP.interval_minutes(market_open) * 60
             next_run += interval

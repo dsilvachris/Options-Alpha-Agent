@@ -30,12 +30,24 @@ def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/config.js")
+def config_js() -> FileResponse:
+    """Data-source selector. The published site ships a static-mode version."""
+    return FileResponse(STATIC / "config.js", media_type="application/javascript")
+
+
 @app.get("/api/state")
 def state() -> JSONResponse:
     """Everything the terminal renders, in one poll."""
     store = get_store()
     return JSONResponse(
         {
+            "meta": {
+                "generated_at": config.now_et().isoformat(),
+                "market_open": None,
+                "mode": "live",
+                "dry_run": config.ENV.dry_run,
+            },
             "config": config.summary(),
             "pipeline": pipeline_mod.cycle_pipeline(store),
             "cycles": pipeline_mod.recent_cycles(store),

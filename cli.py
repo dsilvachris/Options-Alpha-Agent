@@ -8,6 +8,7 @@ Command line interface for the Options Alpha Agent.
     .venv/bin/python cli.py scores      Section 4.4 score-distribution report
     .venv/bin/python cli.py reconcile   Reconcile local positions against Alpaca
     .venv/bin/python cli.py clear-simulated  Close all DRY_RUN positions
+    .venv/bin/python cli.py publish     Export the dashboard as static JSON
     .venv/bin/python cli.py flatten     Close all open positions
     .venv/bin/python cli.py dashboard   Serve the financial-terminal dashboard
     .venv/bin/python cli.py ledger      Section 8.1/8.2/8.3 monitoring report
@@ -30,7 +31,7 @@ from agent import Agent
 from config import ENV, SCORING, fmt_et, now_et
 from evaluation.scorer import CHECK_NAMES
 from execution.orders import Executor
-from logging.events import EventLog
+from logging.events import EventLog, Stage
 from logging.store import get_store
 from monitoring import baseline as baseline_mod
 from monitoring import ledger as ledger_mod
@@ -164,12 +165,16 @@ async def cmd_scan(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 # loop
 # ---------------------------------------------------------------------------
-async def cmd_loop(_: argparse.Namespace) -> int:
+async def cmd_loop(args: argparse.Namespace) -> int:
     banner()
     require_credentials()
-    print(f"Scanning every {config.LOOP.scan_interval_minutes} minutes. Ctrl-C to stop.")
+    print(f"Scanning every {config.LOOP.scan_interval_minutes} minutes "
+          f"({config.LOOP.closed_market_sleep_minutes} while closed). Ctrl-C to stop.")
+    if args.publish:
+        print("Publishing a static snapshot after each cycle; committing only on "
+              "a material change.")
     async with Agent(echo=True) as agent:
-        await agent.run_forever()
+        await agent.run_forever(publish=args.publish, push=args.push)
     return 0
 
 
@@ -378,6 +383,43 @@ def cmd_mcp_log(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_publish(args: argparse.Namespace) -> int:
+    """Export the dashboard as static JSON for hosting."""
+    from dashboard import export as export_mod
+    from dashboard import git_publish
+
+    banner()
+    store = get_store()
+    events = EventLog.start(store, echo=False)
+    rule("PUBLISH — STATIC DASHBOARD SNAPSHOT")
+
+    try:
+        result = export_mod.publish(store)
+    except export_mod.RedactionError as exc:
+        print(f"{RED}{exc}{RESET}")
+        print(f"\n{RED}Nothing was written.{RESET}")
+        return 2
+
+    print(result.render())
+    events.emit(
+        Stage.EXECUTION,
+        f"Published static dashboard snapshot ({len(result.files)} files, "
+        f"digest {result.digest[:12]})",
+        payload={"digest": result.digest, "generated_at": result.generated_at,
+                 "files": [str(p.name) for p, _ in result.files]},
+    )
+
+    if args.commit:
+        rule("GIT")
+        git = git_publish.commit_and_push(
+            [p for p, _ in result.files],
+            f"dashboard: snapshot {result.generated_at}", events, push=args.push)
+        print(f"  {git.reason}")
+    else:
+        print(f"\n{DIM}Not committing (pass --commit to commit, --push to push).{RESET}")
+    return 0
+
+
 def cmd_clear_simulated(args: argparse.Namespace) -> int:
     """Retire simulated positions so they stop occupying live portfolio slots."""
     from execution.reconcile import clear_simulated_positions, open_simulated_positions
@@ -479,7 +521,12 @@ def main() -> int:
     scan.add_argument("-v", "--verbose", action="store_true",
                       help="print the full check breakdown per symbol")
 
-    sub.add_parser("loop", help="run continuously at the configured interval")
+    loop_p = sub.add_parser("loop", help="run continuously at the configured interval")
+    loop_p.add_argument("--publish", action="store_true",
+                        help="publish a static snapshot after each cycle, "
+                             "committing only when it materially changed")
+    loop_p.add_argument("--push", action="store_true",
+                        help="also push each publish commit")
     scores = sub.add_parser("scores", help="Section 4.4 score-distribution report")
     scores.add_argument("--all-sessions", action="store_true",
                         help="include decisions made outside market hours")
@@ -501,6 +548,13 @@ def main() -> int:
     sub.add_parser("reconcile",
                    help="reconcile local positions against the broker")
 
+    publish_p = sub.add_parser(
+        "publish", help="export the dashboard as static JSON for hosting")
+    publish_p.add_argument("--commit", action="store_true",
+                           help="git commit the published files if they changed")
+    publish_p.add_argument("--push", action="store_true",
+                           help="also push (implies --commit)")
+
     clear_sim = sub.add_parser(
         "clear-simulated",
         help="close all DRY_RUN positions (reason DRY_RUN_CLEARED)")
@@ -521,7 +575,7 @@ def main() -> int:
     sync = {
         "scores": cmd_scores, "ledger": cmd_ledger, "cards": cmd_cards,
         "mcp-log": cmd_mcp_log, "config": cmd_config, "dashboard": cmd_dashboard,
-        "clear-simulated": cmd_clear_simulated,
+        "clear-simulated": cmd_clear_simulated, "publish": cmd_publish,
     }
     if args.command in sync:
         return sync[args.command](args)

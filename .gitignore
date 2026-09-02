@@ -17,9 +17,15 @@ claude_desktop_config.json
 venv/
 env/
 
-# Data & logs
+# Data & logs — the SQLite store never ships
 data/
 logs/
+
+# The published dashboard snapshot IS committed (Vercel serves it).
+# Re-included explicitly because it lives under a directory name that would
+# otherwise be caught by the data/ rule above.
+!dashboard/public/
+!dashboard/public/**
 
 # Python
 __pycache__/

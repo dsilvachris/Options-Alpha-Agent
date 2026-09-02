@@ -173,6 +173,8 @@ All commands use `.venv/bin/python` explicitly — no activated shell is assumed
 .venv/bin/python cli.py mcp-log       # recorded MCP call stream
 .venv/bin/python cli.py config        # active configuration
 .venv/bin/python cli.py dashboard     # financial-terminal dashboard on :8787
+.venv/bin/python cli.py publish       # export the dashboard as static JSON (Vercel)
+.venv/bin/python cli.py loop --publish  # scan continuously, publishing each cycle
 ```
 
 Going live is a deliberate, explicit act:
