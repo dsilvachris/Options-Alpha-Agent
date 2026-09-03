@@ -1,14 +1,554 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T10:05:58.685226-04:00",
-  "generated_at_display": "10:05 EDT",
-  "generated_at_utc": "2026-09-03T14:05:58.685252+00:00",
+  "generated_at": "2026-09-03T10:20:58.946862-04:00",
+  "generated_at_display": "10:20 EDT",
+  "generated_at_utc": "2026-09-03T14:20:58.946907+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
   "dry_run": false
  },
  "decisions": [
+  {
+   "id": 152,
+   "ts": "2026-09-03T14:20:57+00:00",
+   "cycle_id": "54906628375c",
+   "symbol": "IWM",
+   "state": "REJECT",
+   "market_open": true,
+   "score": 0,
+   "structure": "iron condor",
+   "iv_condition": "premium elevated",
+   "trend_condition": "range-bound",
+   "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
+   "card": "Underlying: IWM\nMarket Regime: premium elevated, range-bound\nSelected Strategy: iron condor\nOpportunity Score: 0/100 (85 of 90 available points, rescaled)\nNot evaluated: #2 volatility stable \u2014 NOT EVALUABLE (needs 3 sessions, has 2)\nReason for rejection: hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)\nFinal Decision: NO TRADE",
+   "detail": {
+    "iv_condition": "premium elevated",
+    "trend_condition": "range-bound",
+    "structure": "iron condor",
+    "expiry": "2026-09-04",
+    "dte": 1,
+    "credit": 107.0,
+    "credit_at_cross": 105.0,
+    "width": 5.0,
+    "max_loss_per_contract": 393.0,
+    "breakevens": [
+     291.43,
+     297.07
+    ],
+    "short_delta": 0.2976,
+    "credit_to_width": 0.214,
+    "spread_pct_of_credit": 0.0374,
+    "total_spread_points": 0.04,
+    "min_open_interest": 738,
+    "checks": [
+     {
+      "id": 1,
+      "name": "premium rich",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "ATM IV 0.2104 vs realized vol 0.1274 = ratio 1.652",
+      "threshold": "ATM IV >= 1.2 x 20-day realized vol",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 2,
+      "name": "volatility stable",
+      "passed": false,
+      "evaluable": false,
+      "state": "NOT_EVALUABLE",
+      "measured": "needs 3 sessions, has 2",
+      "threshold": "at least 3 prior sessions of ATM IV, then ATM IV <= 1.15 x their average",
+      "points": 10,
+      "awarded": 0,
+      "available": 0,
+      "hard_gate": false
+     },
+     {
+      "id": 3,
+      "name": "trend clarity",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "MA separation -0.0039 of price (MA short 296.45, MA long 297.59); structure iron condor wants range-bound",
+      "threshold": "iron condor requires a range-bound tape: |MA separation| <= 0.0050 of price",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 4,
+      "name": "directional agreement",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "iron condor is non-directional (bias 0): no directional agreement required; measured trend range-bound",
+      "threshold": "non-directional structures auto-pass",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": false
+     },
+     {
+      "id": 5,
+      "name": "credit quality",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "credit $107.00 / width $500.00 = 0.214",
+      "threshold": "credit / spread width >= 0.14",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 6,
+      "name": "probability profile",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "short-strike delta 0.298",
+      "threshold": "short-strike |delta| <= 0.3",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": false
+     },
+     {
+      "id": 7,
+      "name": "liquidity",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "bid-ask 0.04 pts = 3.7% of credit $107.00; min open interest 738",
+      "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": true
+     },
+     {
+      "id": 8,
+      "name": "event clear",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "0 blocking corporate action(s) before expiry; IWM is a configured ETF (no issuer earnings)",
+      "threshold": "no earnings or major scheduled event on the underlying before expiry",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": true
+     },
+     {
+      "id": 9,
+      "name": "portfolio fit",
+      "passed": false,
+      "evaluable": true,
+      "state": "FAIL",
+      "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
+      "threshold": "position count <= 4 and same-direction positions <= 3",
+      "points": 5,
+      "awarded": 0,
+      "available": 5,
+      "hard_gate": true
+     }
+    ],
+    "score": 0,
+    "legs": [
+     {
+      "symbol": "IWM260904P00292500",
+      "side": "sell",
+      "strike": 292.5,
+      "right": "P"
+     },
+     {
+      "symbol": "IWM260904P00287500",
+      "side": "buy",
+      "strike": 287.5,
+      "right": "P"
+     },
+     {
+      "symbol": "IWM260904C00296000",
+      "side": "sell",
+      "strike": 296.0,
+      "right": "C"
+     },
+     {
+      "symbol": "IWM260904C00301000",
+      "side": "buy",
+      "strike": 301.0,
+      "right": "C"
+     }
+    ]
+   }
+  },
+  {
+   "id": 151,
+   "ts": "2026-09-03T14:20:56+00:00",
+   "cycle_id": "54906628375c",
+   "symbol": "QQQ",
+   "state": "REJECT",
+   "market_open": true,
+   "score": 0,
+   "structure": "iron condor",
+   "iv_condition": "premium elevated",
+   "trend_condition": "range-bound",
+   "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
+   "card": "Underlying: QQQ\nMarket Regime: premium elevated, range-bound\nSelected Strategy: iron condor\nOpportunity Score: 0/100 (85 of 90 available points, rescaled)\nNot evaluated: #2 volatility stable \u2014 NOT EVALUABLE (needs 3 sessions, has 2)\nReason for rejection: hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)\nFinal Decision: NO TRADE",
+   "detail": {
+    "iv_condition": "premium elevated",
+    "trend_condition": "range-bound",
+    "structure": "iron condor",
+    "expiry": "2026-09-04",
+    "dte": 1,
+    "credit": 181.5,
+    "credit_at_cross": 175.0,
+    "width": 5.0,
+    "max_loss_per_contract": 318.5,
+    "breakevens": [
+     707.18,
+     719.32
+    ],
+    "short_delta": 0.2884,
+    "credit_to_width": 0.363,
+    "spread_pct_of_credit": 0.0716,
+    "total_spread_points": 0.13,
+    "min_open_interest": 687,
+    "checks": [
+     {
+      "id": 1,
+      "name": "premium rich",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "ATM IV 0.2040 vs realized vol 0.1299 = ratio 1.571",
+      "threshold": "ATM IV >= 1.2 x 20-day realized vol",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 2,
+      "name": "volatility stable",
+      "passed": false,
+      "evaluable": false,
+      "state": "NOT_EVALUABLE",
+      "measured": "needs 3 sessions, has 2",
+      "threshold": "at least 3 prior sessions of ATM IV, then ATM IV <= 1.15 x their average",
+      "points": 10,
+      "awarded": 0,
+      "available": 0,
+      "hard_gate": false
+     },
+     {
+      "id": 3,
+      "name": "trend clarity",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "MA separation 0.0046 of price (MA short 712.61, MA long 709.35); structure iron condor wants range-bound",
+      "threshold": "iron condor requires a range-bound tape: |MA separation| <= 0.0050 of price",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 4,
+      "name": "directional agreement",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "iron condor is non-directional (bias 0): no directional agreement required; measured trend range-bound",
+      "threshold": "non-directional structures auto-pass",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": false
+     },
+     {
+      "id": 5,
+      "name": "credit quality",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "credit $181.50 / width $500.00 = 0.363",
+      "threshold": "credit / spread width >= 0.14",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 6,
+      "name": "probability profile",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "short-strike delta 0.288",
+      "threshold": "short-strike |delta| <= 0.3",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": false
+     },
+     {
+      "id": 7,
+      "name": "liquidity",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "bid-ask 0.13 pts = 7.2% of credit $181.50; min open interest 687",
+      "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": true
+     },
+     {
+      "id": 8,
+      "name": "event clear",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "0 blocking corporate action(s) before expiry; QQQ is a configured ETF (no issuer earnings)",
+      "threshold": "no earnings or major scheduled event on the underlying before expiry",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": true
+     },
+     {
+      "id": 9,
+      "name": "portfolio fit",
+      "passed": false,
+      "evaluable": true,
+      "state": "FAIL",
+      "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
+      "threshold": "position count <= 4 and same-direction positions <= 3",
+      "points": 5,
+      "awarded": 0,
+      "available": 5,
+      "hard_gate": true
+     }
+    ],
+    "score": 0,
+    "legs": [
+     {
+      "symbol": "QQQ260904P00709000",
+      "side": "sell",
+      "strike": 709.0,
+      "right": "P"
+     },
+     {
+      "symbol": "QQQ260904P00704000",
+      "side": "buy",
+      "strike": 704.0,
+      "right": "P"
+     },
+     {
+      "symbol": "QQQ260904C00717500",
+      "side": "sell",
+      "strike": 717.5,
+      "right": "C"
+     },
+     {
+      "symbol": "QQQ260904C00722500",
+      "side": "buy",
+      "strike": 722.5,
+      "right": "C"
+     }
+    ]
+   }
+  },
+  {
+   "id": 150,
+   "ts": "2026-09-03T14:20:55+00:00",
+   "cycle_id": "54906628375c",
+   "symbol": "SPY",
+   "state": "REJECT",
+   "market_open": true,
+   "score": 0,
+   "structure": "iron condor",
+   "iv_condition": "premium elevated",
+   "trend_condition": "range-bound",
+   "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
+   "card": "Underlying: SPY\nMarket Regime: premium elevated, range-bound\nSelected Strategy: iron condor\nOpportunity Score: 0/100 (85 of 90 available points, rescaled)\nNot evaluated: #2 volatility stable \u2014 NOT EVALUABLE (needs 3 sessions, has 2)\nReason for rejection: hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)\nFinal Decision: NO TRADE",
+   "detail": {
+    "iv_condition": "premium elevated",
+    "trend_condition": "range-bound",
+    "structure": "iron condor",
+    "expiry": "2026-09-04",
+    "dte": 1,
+    "credit": 149.0,
+    "credit_at_cross": 147.0,
+    "width": 5.0,
+    "max_loss_per_contract": 351.0,
+    "breakevens": [
+     763.51,
+     773.49
+    ],
+    "short_delta": 0.2934,
+    "credit_to_width": 0.298,
+    "spread_pct_of_credit": 0.0268,
+    "total_spread_points": 0.04,
+    "min_open_interest": 3589,
+    "checks": [
+     {
+      "id": 1,
+      "name": "premium rich",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "ATM IV 0.1395 vs realized vol 0.0757 = ratio 1.842",
+      "threshold": "ATM IV >= 1.2 x 20-day realized vol",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 2,
+      "name": "volatility stable",
+      "passed": false,
+      "evaluable": false,
+      "state": "NOT_EVALUABLE",
+      "measured": "needs 3 sessions, has 2",
+      "threshold": "at least 3 prior sessions of ATM IV, then ATM IV <= 1.15 x their average",
+      "points": 10,
+      "awarded": 0,
+      "available": 0,
+      "hard_gate": false
+     },
+     {
+      "id": 3,
+      "name": "trend clarity",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "MA separation 0.0047 of price (MA short 766.45, MA long 762.81); structure iron condor wants range-bound",
+      "threshold": "iron condor requires a range-bound tape: |MA separation| <= 0.0050 of price",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 4,
+      "name": "directional agreement",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "iron condor is non-directional (bias 0): no directional agreement required; measured trend range-bound",
+      "threshold": "non-directional structures auto-pass",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": false
+     },
+     {
+      "id": 5,
+      "name": "credit quality",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "credit $149.00 / width $500.00 = 0.298",
+      "threshold": "credit / spread width >= 0.14",
+      "points": 15,
+      "awarded": 15,
+      "available": 15,
+      "hard_gate": false
+     },
+     {
+      "id": 6,
+      "name": "probability profile",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "short-strike delta 0.293",
+      "threshold": "short-strike |delta| <= 0.3",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": false
+     },
+     {
+      "id": 7,
+      "name": "liquidity",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "bid-ask 0.04 pts = 2.7% of credit $149.00; min open interest 3589",
+      "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": true
+     },
+     {
+      "id": 8,
+      "name": "event clear",
+      "passed": true,
+      "evaluable": true,
+      "state": "PASS",
+      "measured": "0 blocking corporate action(s) before expiry; SPY is a configured ETF (no issuer earnings)",
+      "threshold": "no earnings or major scheduled event on the underlying before expiry",
+      "points": 10,
+      "awarded": 10,
+      "available": 10,
+      "hard_gate": true
+     },
+     {
+      "id": 9,
+      "name": "portfolio fit",
+      "passed": false,
+      "evaluable": true,
+      "state": "FAIL",
+      "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
+      "threshold": "position count <= 4 and same-direction positions <= 3",
+      "points": 5,
+      "awarded": 0,
+      "available": 5,
+      "hard_gate": true
+     }
+    ],
+    "score": 0,
+    "legs": [
+     {
+      "symbol": "SPY260904P00765000",
+      "side": "sell",
+      "strike": 765.0,
+      "right": "P"
+     },
+     {
+      "symbol": "SPY260904P00760000",
+      "side": "buy",
+      "strike": 760.0,
+      "right": "P"
+     },
+     {
+      "symbol": "SPY260904C00772000",
+      "side": "sell",
+      "strike": 772.0,
+      "right": "C"
+     },
+     {
+      "symbol": "SPY260904C00777000",
+      "side": "buy",
+      "strike": 777.0,
+      "right": "C"
+     }
+    ]
+   }
+  },
   {
    "id": 149,
    "ts": "2026-09-03T14:05:57+00:00",
@@ -16283,520 +16823,6 @@
       "evaluable": true,
       "state": "PASS",
       "measured": "bid-ask 0.10 pts = 13.7% of credit $73.00; min open interest 431",
-      "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": true
-     },
-     {
-      "id": 8,
-      "name": "event clear",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "0 blocking corporate action(s) before expiry; IWM is a configured ETF (no issuer earnings)",
-      "threshold": "no earnings or major scheduled event on the underlying before expiry",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": true
-     },
-     {
-      "id": 9,
-      "name": "portfolio fit",
-      "passed": false,
-      "evaluable": true,
-      "state": "FAIL",
-      "measured": "open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
-      "threshold": "position count <= 4 and same-direction positions <= 3",
-      "points": 5,
-      "awarded": 0,
-      "available": 5,
-      "hard_gate": true
-     }
-    ],
-    "score": 0,
-    "legs": [
-     {
-      "symbol": "IWM260903P00291000",
-      "side": "sell",
-      "strike": 291.0,
-      "right": "P"
-     },
-     {
-      "symbol": "IWM260903P00286000",
-      "side": "buy",
-      "strike": 286.0,
-      "right": "P"
-     },
-     {
-      "symbol": "IWM260903C00295000",
-      "side": "sell",
-      "strike": 295.0,
-      "right": "C"
-     },
-     {
-      "symbol": "IWM260903C00300000",
-      "side": "buy",
-      "strike": 300.0,
-      "right": "C"
-     }
-    ]
-   }
-  },
-  {
-   "id": 52,
-   "ts": "2026-09-02T16:24:03+00:00",
-   "cycle_id": "6873d1d8520c",
-   "symbol": "QQQ",
-   "state": "REJECT",
-   "market_open": true,
-   "score": 0,
-   "structure": "bull put credit spread",
-   "iv_condition": "premium elevated",
-   "trend_condition": "clear uptrend",
-   "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 2 (bias +1)",
-   "card": "Underlying: QQQ\nMarket Regime: premium elevated, clear uptrend\nSelected Strategy: bull put credit spread\nOpportunity Score: 0/100 (85 of 90 available points, rescaled)\nNot evaluated: #2 volatility stable \u2014 NOT EVALUABLE (needs 3 sessions, has 1)\nReason for rejection: hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 2 (bias +1)\nFinal Decision: NO TRADE",
-   "detail": {
-    "iv_condition": "premium elevated",
-    "trend_condition": "clear uptrend",
-    "structure": "bull put credit spread",
-    "expiry": "2026-09-03",
-    "dte": 1,
-    "credit": 81.0,
-    "credit_at_cross": 78.0,
-    "width": 5.0,
-    "max_loss_per_contract": 419.0,
-    "breakevens": [
-     703.19
-    ],
-    "short_delta": 0.2723,
-    "credit_to_width": 0.162,
-    "spread_pct_of_credit": 0.0741,
-    "total_spread_points": 0.06,
-    "min_open_interest": 140,
-    "checks": [
-     {
-      "id": 1,
-      "name": "premium rich",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "ATM IV 0.1919 vs realized vol 0.1285 = ratio 1.492",
-      "threshold": "ATM IV >= 1.2 x 20-day realized vol",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 2,
-      "name": "volatility stable",
-      "passed": false,
-      "evaluable": false,
-      "state": "NOT_EVALUABLE",
-      "measured": "needs 3 sessions, has 1",
-      "threshold": "at least 3 prior sessions of ATM IV, then ATM IV <= 1.15 x their average",
-      "points": 10,
-      "awarded": 0,
-      "available": 0,
-      "hard_gate": false
-     },
-     {
-      "id": 3,
-      "name": "trend clarity",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "MA separation 0.0052 of price (MA short 712.33, MA long 708.63); structure bull put credit spread wants a clear trend",
-      "threshold": "directional structure requires a clear trend: |MA separation| > 0.0050 of price",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 4,
-      "name": "directional agreement",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "structure bias +1 (bull put credit spread) vs trend direction +1 (clear uptrend)",
-      "threshold": "structure bias matches the measured trend direction",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": false
-     },
-     {
-      "id": 5,
-      "name": "credit quality",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "credit $81.00 / width $500.00 = 0.162",
-      "threshold": "credit / spread width >= 0.14",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 6,
-      "name": "probability profile",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "short-strike delta 0.272",
-      "threshold": "short-strike |delta| <= 0.3",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": false
-     },
-     {
-      "id": 7,
-      "name": "liquidity",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "bid-ask 0.06 pts = 7.4% of credit $81.00; min open interest 140",
-      "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": true
-     },
-     {
-      "id": 8,
-      "name": "event clear",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "0 blocking corporate action(s) before expiry; QQQ is a configured ETF (no issuer earnings)",
-      "threshold": "no earnings or major scheduled event on the underlying before expiry",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": true
-     },
-     {
-      "id": 9,
-      "name": "portfolio fit",
-      "passed": false,
-      "evaluable": true,
-      "state": "FAIL",
-      "measured": "open positions 4 (+1 proposed); same-direction positions 2 (bias +1)",
-      "threshold": "position count <= 4 and same-direction positions <= 3",
-      "points": 5,
-      "awarded": 0,
-      "available": 5,
-      "hard_gate": true
-     }
-    ],
-    "score": 0,
-    "legs": [
-     {
-      "symbol": "QQQ260903P00704000",
-      "side": "sell",
-      "strike": 704.0,
-      "right": "P"
-     },
-     {
-      "symbol": "QQQ260903P00699000",
-      "side": "buy",
-      "strike": 699.0,
-      "right": "P"
-     }
-    ]
-   }
-  },
-  {
-   "id": 51,
-   "ts": "2026-09-02T16:24:02+00:00",
-   "cycle_id": "6873d1d8520c",
-   "symbol": "SPY",
-   "state": "REJECT",
-   "market_open": true,
-   "score": 0,
-   "structure": "bull put credit spread",
-   "iv_condition": "premium elevated",
-   "trend_condition": "clear uptrend",
-   "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 2 (bias +1)",
-   "card": "Underlying: SPY\nMarket Regime: premium elevated, clear uptrend\nSelected Strategy: bull put credit spread\nOpportunity Score: 0/100 (85 of 90 available points, rescaled)\nNot evaluated: #2 volatility stable \u2014 NOT EVALUABLE (needs 3 sessions, has 1)\nReason for rejection: hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 2 (bias +1)\nFinal Decision: NO TRADE",
-   "detail": {
-    "iv_condition": "premium elevated",
-    "trend_condition": "clear uptrend",
-    "structure": "bull put credit spread",
-    "expiry": "2026-09-03",
-    "dte": 1,
-    "credit": 75.0,
-    "credit_at_cross": 74.0,
-    "width": 5.0,
-    "max_loss_per_contract": 425.0,
-    "breakevens": [
-     761.25
-    ],
-    "short_delta": 0.2947,
-    "credit_to_width": 0.15,
-    "spread_pct_of_credit": 0.0267,
-    "total_spread_points": 0.02,
-    "min_open_interest": 550,
-    "checks": [
-     {
-      "id": 1,
-      "name": "premium rich",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "ATM IV 0.1372 vs realized vol 0.0737 = ratio 1.862",
-      "threshold": "ATM IV >= 1.2 x 20-day realized vol",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 2,
-      "name": "volatility stable",
-      "passed": false,
-      "evaluable": false,
-      "state": "NOT_EVALUABLE",
-      "measured": "needs 3 sessions, has 1",
-      "threshold": "at least 3 prior sessions of ATM IV, then ATM IV <= 1.15 x their average",
-      "points": 10,
-      "awarded": 0,
-      "available": 0,
-      "hard_gate": false
-     },
-     {
-      "id": 3,
-      "name": "trend clarity",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "MA separation 0.0053 of price (MA short 765.82, MA long 761.78); structure bull put credit spread wants a clear trend",
-      "threshold": "directional structure requires a clear trend: |MA separation| > 0.0050 of price",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 4,
-      "name": "directional agreement",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "structure bias +1 (bull put credit spread) vs trend direction +1 (clear uptrend)",
-      "threshold": "structure bias matches the measured trend direction",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": false
-     },
-     {
-      "id": 5,
-      "name": "credit quality",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "credit $75.00 / width $500.00 = 0.150",
-      "threshold": "credit / spread width >= 0.14",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 6,
-      "name": "probability profile",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "short-strike delta 0.295",
-      "threshold": "short-strike |delta| <= 0.3",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": false
-     },
-     {
-      "id": 7,
-      "name": "liquidity",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "bid-ask 0.02 pts = 2.7% of credit $75.00; min open interest 550",
-      "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": true
-     },
-     {
-      "id": 8,
-      "name": "event clear",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "0 blocking corporate action(s) before expiry; SPY is a configured ETF (no issuer earnings)",
-      "threshold": "no earnings or major scheduled event on the underlying before expiry",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": true
-     },
-     {
-      "id": 9,
-      "name": "portfolio fit",
-      "passed": false,
-      "evaluable": true,
-      "state": "FAIL",
-      "measured": "open positions 4 (+1 proposed); same-direction positions 2 (bias +1)",
-      "threshold": "position count <= 4 and same-direction positions <= 3",
-      "points": 5,
-      "awarded": 0,
-      "available": 5,
-      "hard_gate": true
-     }
-    ],
-    "score": 0,
-    "legs": [
-     {
-      "symbol": "SPY260903P00762000",
-      "side": "sell",
-      "strike": 762.0,
-      "right": "P"
-     },
-     {
-      "symbol": "SPY260903P00757000",
-      "side": "buy",
-      "strike": 757.0,
-      "right": "P"
-     }
-    ]
-   }
-  },
-  {
-   "id": 50,
-   "ts": "2026-09-02T16:13:50+00:00",
-   "cycle_id": "1baacb41b37f",
-   "symbol": "IWM",
-   "state": "REJECT",
-   "market_open": true,
-   "score": 0,
-   "structure": "iron condor",
-   "iv_condition": "premium elevated",
-   "trend_condition": "range-bound",
-   "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
-   "card": "Underlying: IWM\nMarket Regime: premium elevated, range-bound\nSelected Strategy: iron condor\nOpportunity Score: 0/100 (85 of 90 available points, rescaled)\nNot evaluated: #2 volatility stable \u2014 NOT EVALUABLE (needs 3 sessions, has 1)\nReason for rejection: hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)\nFinal Decision: NO TRADE",
-   "detail": {
-    "iv_condition": "premium elevated",
-    "trend_condition": "range-bound",
-    "structure": "iron condor",
-    "expiry": "2026-09-03",
-    "dte": 1,
-    "credit": 71.5,
-    "credit_at_cross": 69.0,
-    "width": 5.0,
-    "max_loss_per_contract": 428.5,
-    "breakevens": [
-     290.29,
-     295.71
-    ],
-    "short_delta": 0.239,
-    "credit_to_width": 0.143,
-    "spread_pct_of_credit": 0.0699,
-    "total_spread_points": 0.05,
-    "min_open_interest": 431,
-    "checks": [
-     {
-      "id": 1,
-      "name": "premium rich",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "ATM IV 0.1840 vs realized vol 0.1247 = ratio 1.476",
-      "threshold": "ATM IV >= 1.2 x 20-day realized vol",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 2,
-      "name": "volatility stable",
-      "passed": false,
-      "evaluable": false,
-      "state": "NOT_EVALUABLE",
-      "measured": "needs 3 sessions, has 1",
-      "threshold": "at least 3 prior sessions of ATM IV, then ATM IV <= 1.15 x their average",
-      "points": 10,
-      "awarded": 0,
-      "available": 0,
-      "hard_gate": false
-     },
-     {
-      "id": 3,
-      "name": "trend clarity",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "MA separation -0.0027 of price (MA short 296.70, MA long 297.49); structure iron condor wants range-bound",
-      "threshold": "iron condor requires a range-bound tape: |MA separation| <= 0.0050 of price",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 4,
-      "name": "directional agreement",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "iron condor is non-directional (bias 0): no directional agreement required; measured trend range-bound",
-      "threshold": "non-directional structures auto-pass",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": false
-     },
-     {
-      "id": 5,
-      "name": "credit quality",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "credit $71.50 / width $500.00 = 0.143",
-      "threshold": "credit / spread width >= 0.14",
-      "points": 15,
-      "awarded": 15,
-      "available": 15,
-      "hard_gate": false
-     },
-     {
-      "id": 6,
-      "name": "probability profile",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "short-strike delta 0.239",
-      "threshold": "short-strike |delta| <= 0.3",
-      "points": 10,
-      "awarded": 10,
-      "available": 10,
-      "hard_gate": false
-     },
-     {
-      "id": 7,
-      "name": "liquidity",
-      "passed": true,
-      "evaluable": true,
-      "state": "PASS",
-      "measured": "bid-ask 0.05 pts = 7.0% of credit $71.50; min open interest 431",
       "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
       "points": 10,
       "awarded": 10,
