@@ -1,8 +1,8 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T10:35:59.261592-04:00",
-  "generated_at_display": "10:35 EDT",
-  "generated_at_utc": "2026-09-03T14:35:59.261641+00:00",
+  "generated_at": "2026-09-03T10:50:59.264395-04:00",
+  "generated_at_display": "10:50 EDT",
+  "generated_at_utc": "2026-09-03T14:50:59.264446+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
@@ -10,6 +10,27 @@
  },
  "realized_pnl": 162.0,
  "open_positions": [
+  {
+   "id": 17,
+   "position_key": "IWM|iron condor|2026-09-03|9d824c1c#2",
+   "symbol": "IWM",
+   "structure": "iron condor",
+   "opened_ts": "2026-09-03T14:50:53+00:00",
+   "closed_ts": null,
+   "status": "OPEN",
+   "contracts": 4,
+   "credit": 332.0,
+   "width": 5.0,
+   "max_loss": 1668.0,
+   "expiry": "2026-09-03",
+   "legs": "[{\"symbol\": \"IWM260903P00290000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 290.0, \"right\": \"P\"}, {\"symbol\": \"IWM260903P00285000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 285.0, \"right\": \"P\"}, {\"symbol\": \"IWM260903C00294000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 294.0, \"right\": \"C\"}, {\"symbol\": \"IWM260903C00299000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 299.0, \"right\": \"C\"}]",
+   "entry_order_id": "d91a2feb-5329-40f3-b9fa-e921d809eedc",
+   "exit_order_id": null,
+   "exit_reason": null,
+   "realized_pnl": null,
+   "detail": "{\"dry_run\": false, \"reconciled\": true, \"reconcile_source\": \"order:d91a2feb-5329-40f3-b9fa-e921d809eedc\", \"exit_plan\": {\"profit_target_cost_to_close\": 166.0, \"stop_loss_cost_to_close\": 664.0, \"time_exit_dte\": -1, \"expiry_day_close_et\": \"15:30 ET\", \"credit_collected\": 332.0}, \"credit_per_contract\": 83.0, \"max_loss_per_contract\": 417.0}",
+   "dry_run": 0
+  },
   {
    "id": 15,
    "position_key": "IWM|iron condor|2026-09-04|eda0e7f6#0",
@@ -557,12 +578,19 @@
    "equity": 100384.69,
    "last_equity": 99849.59,
    "cycle_id": "52dfd36e48b6"
+  },
+  {
+   "id": 51,
+   "ts": "2026-09-03T14:50:53+00:00",
+   "equity": 100470.69,
+   "last_equity": 99849.59,
+   "cycle_id": "4f759fb0b316"
   }
  ],
  "avg_score_executed": 96.5,
  "n_executed": 17,
- "avg_score_declined": 11.0,
- "n_declined": 135,
+ "avg_score_declined": 10.8,
+ "n_declined": 138,
  "dry_run_open": 0,
  "dry_run_closed": 7,
  "dry_run_notional_pnl": 0.0
