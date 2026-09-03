@@ -1,34 +1,34 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T15:20:58.774421-04:00",
-  "generated_at_display": "15:20 EDT",
-  "generated_at_utc": "2026-09-03T19:20:58.774437+00:00",
+  "generated_at": "2026-09-03T15:35:59.872998-04:00",
+  "generated_at_display": "15:35 EDT",
+  "generated_at_utc": "2026-09-03T19:35:59.873098+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
   "dry_run": false
  },
- "realized_pnl": -993.0,
+ "realized_pnl": -1055.0,
  "open_positions": [
   {
-   "id": 17,
-   "position_key": "IWM|iron condor|2026-09-03|9d824c1c#2",
-   "symbol": "IWM",
-   "structure": "iron condor",
-   "opened_ts": "2026-09-03T14:50:53+00:00",
+   "id": 18,
+   "position_key": "SPY|bull put credit spread|2026-09-04|6dd2563d#0",
+   "symbol": "SPY",
+   "structure": "bull put credit spread",
+   "opened_ts": "2026-09-03T19:35:56+00:00",
    "closed_ts": null,
    "status": "OPEN",
    "contracts": 4,
-   "credit": 332.0,
+   "credit": 220.0,
    "width": 5.0,
-   "max_loss": 1668.0,
-   "expiry": "2026-09-03",
-   "legs": "[{\"symbol\": \"IWM260903P00290000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 290.0, \"right\": \"P\"}, {\"symbol\": \"IWM260903P00285000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 285.0, \"right\": \"P\"}, {\"symbol\": \"IWM260903C00294000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 294.0, \"right\": \"C\"}, {\"symbol\": \"IWM260903C00299000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 299.0, \"right\": \"C\"}]",
-   "entry_order_id": "d91a2feb-5329-40f3-b9fa-e921d809eedc",
+   "max_loss": 1780.0,
+   "expiry": "2026-09-04",
+   "legs": "[{\"symbol\": \"SPY260904P00770000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 770.0, \"right\": \"P\"}, {\"symbol\": \"SPY260904P00765000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 765.0, \"right\": \"P\"}]",
+   "entry_order_id": "oaa-open-fc6948a762fbe59f95f7",
    "exit_order_id": null,
    "exit_reason": null,
    "realized_pnl": null,
-   "detail": "{\"dry_run\": false, \"reconciled\": true, \"reconcile_source\": \"order:d91a2feb-5329-40f3-b9fa-e921d809eedc\", \"exit_plan\": {\"profit_target_cost_to_close\": 166.0, \"stop_loss_cost_to_close\": 664.0, \"time_exit_dte\": -1, \"expiry_day_close_et\": \"15:30 ET\", \"credit_collected\": 332.0}, \"credit_per_contract\": 83.0, \"max_loss_per_contract\": 417.0}",
+   "detail": "{\"dry_run\": false, \"breakevens\": [769.45], \"exit_plan\": {\"profit_target_cost_to_close\": 110.0, \"stop_loss_cost_to_close\": 440.0, \"time_exit_dte\": -1, \"expiry_day_close_et\": \"15:30 ET\", \"credit_collected\": 220.0}, \"credit_per_contract\": 55.0, \"max_loss_per_contract\": 445.0}",
    "dry_run": 0
   },
   {
@@ -96,6 +96,27 @@
   }
  ],
  "closed_positions": [
+  {
+   "id": 17,
+   "position_key": "IWM|iron condor|2026-09-03|9d824c1c#2",
+   "symbol": "IWM",
+   "structure": "iron condor",
+   "opened_ts": "2026-09-03T14:50:53+00:00",
+   "closed_ts": "2026-09-03T19:35:54+00:00",
+   "status": "CLOSED",
+   "contracts": 4,
+   "credit": 332.0,
+   "width": 5.0,
+   "max_loss": 1668.0,
+   "expiry": "2026-09-03",
+   "legs": "[{\"symbol\": \"IWM260903P00290000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 290.0, \"right\": \"P\"}, {\"symbol\": \"IWM260903P00285000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 285.0, \"right\": \"P\"}, {\"symbol\": \"IWM260903C00294000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 294.0, \"right\": \"C\"}, {\"symbol\": \"IWM260903C00299000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 299.0, \"right\": \"C\"}]",
+   "entry_order_id": "d91a2feb-5329-40f3-b9fa-e921d809eedc",
+   "exit_order_id": "oaa-close-30b495206e24afe112b4",
+   "exit_reason": "expiry-day close: 15:30 ET on the 2026-09-03 expiry reached \u2014 flattening to avoid assignment",
+   "realized_pnl": -62.0,
+   "detail": "{\"dry_run\": false, \"reconciled\": true, \"reconcile_source\": \"order:d91a2feb-5329-40f3-b9fa-e921d809eedc\", \"exit_plan\": {\"profit_target_cost_to_close\": 166.0, \"stop_loss_cost_to_close\": 664.0, \"time_exit_dte\": -1, \"expiry_day_close_et\": \"15:30 ET\", \"credit_collected\": 332.0}, \"credit_per_contract\": 83.0, \"max_loss_per_contract\": 417.0}",
+   "dry_run": 0
+  },
   {
    "id": 16,
    "position_key": "IWM|iron condor|2026-09-03|9d824c1c#1",
@@ -224,6 +245,7 @@
   }
  ],
  "exits_by_reason": {
+  "end-of-window flatten": 1,
   "profit target": 3,
   "stop loss": 2,
   "other": 1
@@ -711,12 +733,19 @@
    "equity": 98153.09,
    "last_equity": 99849.59,
    "cycle_id": "f6d3106efd08"
+  },
+  {
+   "id": 70,
+   "ts": "2026-09-03T19:35:53+00:00",
+   "equity": 98151.09,
+   "last_equity": 99849.59,
+   "cycle_id": "afb2401eaa28"
   }
  ],
- "avg_score_executed": 96.5,
- "n_executed": 17,
+ "avg_score_executed": 95.7,
+ "n_executed": 18,
  "avg_score_declined": 7.7,
- "n_declined": 192,
+ "n_declined": 194,
  "dry_run_open": 0,
  "dry_run_closed": 7,
  "dry_run_notional_pnl": 0.0

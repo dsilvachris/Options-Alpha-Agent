@@ -1,8 +1,8 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T15:20:58.774421-04:00",
-  "generated_at_display": "15:20 EDT",
-  "generated_at_utc": "2026-09-03T19:20:58.774437+00:00",
+  "generated_at": "2026-09-03T15:35:59.872998-04:00",
+  "generated_at_display": "15:35 EDT",
+  "generated_at_utc": "2026-09-03T19:35:59.873098+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
@@ -11,57 +11,43 @@
  "open": [
   {
    "dry_run": false,
-   "symbol": "IWM",
-   "structure": "iron condor",
+   "symbol": "SPY",
+   "structure": "bull put credit spread",
    "contracts": 4,
-   "credit": 332.0,
+   "credit": 220.0,
    "width": 5.0,
-   "max_loss": 1668.0,
-   "expiry": "2026-09-03",
-   "opened_ts": "2026-09-03T14:50:53+00:00",
+   "max_loss": 1780.0,
+   "expiry": "2026-09-04",
+   "opened_ts": "2026-09-03T19:35:56+00:00",
    "legs": [
     {
-     "symbol": "IWM260903P00290000",
+     "symbol": "SPY260904P00770000",
      "side": "sell",
      "position_intent": "sell_to_open",
      "ratio_qty": 1,
-     "strike": 290.0,
+     "strike": 770.0,
      "right": "P"
     },
     {
-     "symbol": "IWM260903P00285000",
+     "symbol": "SPY260904P00765000",
      "side": "buy",
      "position_intent": "buy_to_open",
      "ratio_qty": 1,
-     "strike": 285.0,
+     "strike": 765.0,
      "right": "P"
-    },
-    {
-     "symbol": "IWM260903C00294000",
-     "side": "sell",
-     "position_intent": "sell_to_open",
-     "ratio_qty": 1,
-     "strike": 294.0,
-     "right": "C"
-    },
-    {
-     "symbol": "IWM260903C00299000",
-     "side": "buy",
-     "position_intent": "buy_to_open",
-     "ratio_qty": 1,
-     "strike": 299.0,
-     "right": "C"
     }
    ],
    "exit_plan": {
-    "profit_target_cost_to_close": 166.0,
-    "stop_loss_cost_to_close": 664.0,
+    "profit_target_cost_to_close": 110.0,
+    "stop_loss_cost_to_close": 440.0,
     "time_exit_dte": -1,
     "expiry_day_close_et": "15:30 ET",
-    "credit_collected": 332.0
+    "credit_collected": 220.0
    },
-   "breakevens": null,
-   "reconciled": true
+   "breakevens": [
+    769.45
+   ],
+   "reconciled": false
   },
   {
    "dry_run": false,
@@ -236,6 +222,16 @@
   }
  ],
  "closed": [
+  {
+   "dry_run": false,
+   "symbol": "IWM",
+   "structure": "iron condor",
+   "contracts": 4,
+   "credit": 332.0,
+   "realized_pnl": -62.0,
+   "exit_reason": "expiry-day close: 15:30 ET on the 2026-09-03 expiry reached \u2014 flattening to avoid assignment",
+   "closed_ts": "2026-09-03T19:35:54+00:00"
+  },
   {
    "dry_run": false,
    "symbol": "IWM",
