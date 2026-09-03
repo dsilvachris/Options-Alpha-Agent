@@ -1,27 +1,84 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T09:20:56.942634-04:00",
-  "generated_at_display": "09:20 EDT",
-  "generated_at_utc": "2026-09-03T13:20:56.942673+00:00",
+  "generated_at": "2026-09-03T09:38:03.857128-04:00",
+  "generated_at_display": "09:38 EDT",
+  "generated_at_utc": "2026-09-03T13:38:03.857159+00:00",
   "timezone": "America/New_York",
-  "market_open": false,
+  "market_open": true,
   "mode": "static",
   "dry_run": false
  },
  "open": [
   {
    "dry_run": false,
-   "symbol": "QQQ",
-   "structure": "bull put credit spread",
+   "symbol": "IWM",
+   "structure": "iron condor",
    "contracts": 4,
-   "credit": 304.0,
+   "credit": 342.0,
    "width": 5.0,
-   "max_loss": 1696.0,
-   "expiry": "2026-09-03",
-   "opened_ts": "2026-09-02T15:29:31+00:00",
+   "max_loss": 1658.0,
+   "expiry": "2026-09-04",
+   "opened_ts": "2026-09-03T13:37:42+00:00",
    "legs": [
     {
-     "symbol": "QQQ260903P00705000",
+     "symbol": "IWM260904P00293000",
+     "side": "sell",
+     "position_intent": "sell_to_open",
+     "ratio_qty": 1,
+     "strike": 293.0,
+     "right": "P"
+    },
+    {
+     "symbol": "IWM260904P00288000",
+     "side": "buy",
+     "position_intent": "buy_to_open",
+     "ratio_qty": 1,
+     "strike": 288.0,
+     "right": "P"
+    },
+    {
+     "symbol": "IWM260904C00297500",
+     "side": "sell",
+     "position_intent": "sell_to_open",
+     "ratio_qty": 1,
+     "strike": 297.5,
+     "right": "C"
+    },
+    {
+     "symbol": "IWM260904C00302500",
+     "side": "buy",
+     "position_intent": "buy_to_open",
+     "ratio_qty": 1,
+     "strike": 302.5,
+     "right": "C"
+    }
+   ],
+   "exit_plan": {
+    "profit_target_cost_to_close": 171.0,
+    "stop_loss_cost_to_close": 684.0,
+    "time_exit_dte": -1,
+    "expiry_day_close_et": "15:30 ET",
+    "credit_collected": 342.0
+   },
+   "breakevens": [
+    292.14,
+    298.36
+   ],
+   "reconciled": false
+  },
+  {
+   "dry_run": false,
+   "symbol": "QQQ",
+   "structure": "iron condor",
+   "contracts": 6,
+   "credit": 1038.0,
+   "width": 5.0,
+   "max_loss": 1962.0,
+   "expiry": "2026-09-04",
+   "opened_ts": "2026-09-03T13:36:39+00:00",
+   "legs": [
+    {
+     "symbol": "QQQ260904P00705000",
      "side": "sell",
      "position_intent": "sell_to_open",
      "ratio_qty": 1,
@@ -29,117 +86,97 @@
      "right": "P"
     },
     {
-     "symbol": "QQQ260903P00700000",
+     "symbol": "QQQ260904P00700000",
      "side": "buy",
      "position_intent": "buy_to_open",
      "ratio_qty": 1,
      "strike": 700.0,
      "right": "P"
+    },
+    {
+     "symbol": "QQQ260904C00715000",
+     "side": "sell",
+     "position_intent": "sell_to_open",
+     "ratio_qty": 1,
+     "strike": 715.0,
+     "right": "C"
+    },
+    {
+     "symbol": "QQQ260904C00720000",
+     "side": "buy",
+     "position_intent": "buy_to_open",
+     "ratio_qty": 1,
+     "strike": 720.0,
+     "right": "C"
     }
    ],
    "exit_plan": {
-    "profit_target_cost_to_close": 152.0,
-    "stop_loss_cost_to_close": 608.0,
-    "time_exit_dte": 0,
-    "credit_collected": 304.0
+    "profit_target_cost_to_close": 519.0,
+    "stop_loss_cost_to_close": 2076.0,
+    "time_exit_dte": -1,
+    "expiry_day_close_et": "15:30 ET",
+    "credit_collected": 1038.0
    },
    "breakevens": [
-    704.24
+    703.27,
+    716.73
    ],
    "reconciled": false
   },
   {
    "dry_run": false,
    "symbol": "SPY",
-   "structure": "bull put credit spread",
-   "contracts": 4,
-   "credit": 296.0,
-   "width": 5.0,
-   "max_loss": 1704.0,
-   "expiry": "2026-09-03",
-   "opened_ts": "2026-09-02T15:28:47+00:00",
-   "legs": [
-    {
-     "symbol": "SPY260903P00763000",
-     "side": "sell",
-     "position_intent": "sell_to_open",
-     "ratio_qty": 1,
-     "strike": 763.0,
-     "right": "P"
-    },
-    {
-     "symbol": "SPY260903P00758000",
-     "side": "buy",
-     "position_intent": "buy_to_open",
-     "ratio_qty": 1,
-     "strike": 758.0,
-     "right": "P"
-    }
-   ],
-   "exit_plan": {
-    "profit_target_cost_to_close": 148.0,
-    "stop_loss_cost_to_close": 592.0,
-    "time_exit_dte": 0,
-    "credit_collected": 296.0
-   },
-   "breakevens": [
-    762.26
-   ],
-   "reconciled": false
-  },
-  {
-   "dry_run": false,
-   "symbol": "IWM",
    "structure": "iron condor",
-   "contracts": 4,
-   "credit": 350.0,
+   "contracts": 5,
+   "credit": 660.0,
    "width": 5.0,
-   "max_loss": 1650.0,
-   "expiry": "2026-09-03",
-   "opened_ts": "2026-09-02T13:51:09+00:00",
+   "max_loss": 1840.0,
+   "expiry": "2026-09-04",
+   "opened_ts": "2026-09-03T13:35:56+00:00",
    "legs": [
     {
-     "symbol": "IWM260903P00290000",
+     "symbol": "SPY260904P00765000",
      "side": "sell",
      "position_intent": "sell_to_open",
      "ratio_qty": 1,
-     "strike": 290.0,
+     "strike": 765.0,
      "right": "P"
     },
     {
-     "symbol": "IWM260903P00285000",
+     "symbol": "SPY260904P00760000",
      "side": "buy",
      "position_intent": "buy_to_open",
      "ratio_qty": 1,
-     "strike": 285.0,
+     "strike": 760.0,
      "right": "P"
     },
     {
-     "symbol": "IWM260903C00294000",
+     "symbol": "SPY260904C00773000",
      "side": "sell",
      "position_intent": "sell_to_open",
      "ratio_qty": 1,
-     "strike": 294.0,
+     "strike": 773.0,
      "right": "C"
     },
     {
-     "symbol": "IWM260903C00299000",
+     "symbol": "SPY260904C00778000",
      "side": "buy",
      "position_intent": "buy_to_open",
      "ratio_qty": 1,
-     "strike": 299.0,
+     "strike": 778.0,
      "right": "C"
     }
    ],
    "exit_plan": {
-    "profit_target_cost_to_close": 175.0,
-    "stop_loss_cost_to_close": 700.0,
-    "time_exit_dte": 0,
-    "credit_collected": 350.0
+    "profit_target_cost_to_close": 330.0,
+    "stop_loss_cost_to_close": 1320.0,
+    "time_exit_dte": -1,
+    "expiry_day_close_et": "15:30 ET",
+    "credit_collected": 660.0
    },
    "breakevens": [
-    289.12,
-    294.88
+    763.68,
+    774.32
    ],
    "reconciled": false
   },
@@ -201,6 +238,36 @@
   }
  ],
  "closed": [
+  {
+   "dry_run": false,
+   "symbol": "QQQ",
+   "structure": "bull put credit spread",
+   "contracts": 4,
+   "credit": 304.0,
+   "realized_pnl": 203.99999999999997,
+   "exit_reason": "profit target: cost to close $100.00 at or below 50% of $304.00 credit ($152.00)",
+   "closed_ts": "2026-09-03T13:35:55+00:00"
+  },
+  {
+   "dry_run": false,
+   "symbol": "SPY",
+   "structure": "bull put credit spread",
+   "contracts": 4,
+   "credit": 296.0,
+   "realized_pnl": 248.0,
+   "exit_reason": "profit target: cost to close $48.00 at or below 50% of $296.00 credit ($148.00)",
+   "closed_ts": "2026-09-03T13:35:54+00:00"
+  },
+  {
+   "dry_run": false,
+   "symbol": "IWM",
+   "structure": "iron condor",
+   "contracts": 4,
+   "credit": 350.0,
+   "realized_pnl": -466.0,
+   "exit_reason": "stop loss: cost to close $816.00 at or above 2x the $350.00 credit ($700.00)",
+   "closed_ts": "2026-09-03T13:35:54+00:00"
+  },
   {
    "dry_run": false,
    "symbol": "SPY",
