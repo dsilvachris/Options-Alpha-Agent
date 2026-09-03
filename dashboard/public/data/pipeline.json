@@ -1,15 +1,15 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T15:51:00.153951-04:00",
-  "generated_at_display": "15:51 EDT",
-  "generated_at_utc": "2026-09-03T19:51:00.153984+00:00",
+  "generated_at": "2026-09-03T16:05:59.546066-04:00",
+  "generated_at_display": "16:05 EDT",
+  "generated_at_utc": "2026-09-03T20:05:59.546120+00:00",
   "timezone": "America/New_York",
-  "market_open": true,
+  "market_open": false,
   "mode": "static",
   "dry_run": false
  },
  "pipeline": {
-  "cycle_id": "c1ca80f9b4d4",
+  "cycle_id": "c3dfeb024641",
   "stages": [
    {
     "stage": "MARKET_SCAN",
@@ -18,35 +18,35 @@
     "count": 7,
     "events": [
      {
-      "id": 2487,
-      "ts": "2026-09-03T19:50:53+00:00",
+      "id": 2523,
+      "ts": "2026-09-03T20:05:53+00:00",
       "stage": "MARKET_SCAN",
       "symbol": null,
-      "message": "Account equity $98,232.99; market OPEN",
+      "message": "Account equity $98,173.99; market CLOSED \u2014 pipeline runs, no order will be submitted",
       "payload": {
-       "equity": 98232.99,
+       "equity": 98173.99,
        "cash": 101228.99,
        "buying_power": 366915.96,
        "options_approved_level": 3,
-       "market_open": true
+       "market_open": false
       }
      },
      {
-      "id": 2497,
-      "ts": "2026-09-03T19:50:54+00:00",
+      "id": 2533,
+      "ts": "2026-09-03T20:05:54+00:00",
       "stage": "MARKET_SCAN",
       "symbol": "SPY",
       "message": "Scanning SPY",
       "payload": null
      },
      {
-      "id": 2498,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2534,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "MARKET_SCAN",
       "symbol": "SPY",
-      "message": "SPY spot $773.23; 380 eligible contract(s) across 1 expiry(ies)",
+      "message": "SPY spot $773.12; 380 eligible contract(s) across 1 expiry(ies)",
       "payload": {
-       "spot": 773.23,
+       "spot": 773.115,
        "contracts": 380,
        "expiries": [
         "2026-09-04"
@@ -55,21 +55,21 @@
       }
      },
      {
-      "id": 2504,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2540,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "MARKET_SCAN",
       "symbol": "QQQ",
       "message": "Scanning QQQ",
       "payload": null
      },
      {
-      "id": 2505,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2541,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "MARKET_SCAN",
       "symbol": "QQQ",
-      "message": "QQQ spot $717.37; 436 eligible contract(s) across 1 expiry(ies)",
+      "message": "QQQ spot $717.25; 436 eligible contract(s) across 1 expiry(ies)",
       "payload": {
-       "spot": 717.365,
+       "spot": 717.25,
        "contracts": 436,
        "expiries": [
         "2026-09-04"
@@ -78,21 +78,21 @@
       }
      },
      {
-      "id": 2511,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2547,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "MARKET_SCAN",
       "symbol": "IWM",
       "message": "Scanning IWM",
       "payload": null
      },
      {
-      "id": 2512,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2548,
+      "ts": "2026-09-03T20:05:57+00:00",
       "stage": "MARKET_SCAN",
       "symbol": "IWM",
-      "message": "IWM spot $295.15; 194 eligible contract(s) across 1 expiry(ies)",
+      "message": "IWM spot $295.12; 194 eligible contract(s) across 1 expiry(ies)",
       "payload": {
-       "spot": 295.155,
+       "spot": 295.12,
        "contracts": 194,
        "expiries": [
         "2026-09-04"
@@ -109,60 +109,60 @@
     "count": 3,
     "events": [
      {
-      "id": 2499,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2535,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "MARKET_ANALYSIS",
       "symbol": "SPY",
-      "message": "SPY: premium elevated (ATM IV 0.12 vs RV 0.0829), clear uptrend (MA separation 0.0051)",
+      "message": "SPY: premium elevated (ATM IV 0.1188 vs RV 0.0827), clear uptrend (MA separation 0.0051)",
       "payload": {
        "iv_condition": "premium elevated",
-       "atm_iv": 0.12004999999999999,
-       "realized_vol": 0.08288437499635302,
-       "iv_rv_ratio": 1.4484032726950318,
+       "atm_iv": 0.11879999999999999,
+       "realized_vol": 0.08269518200525693,
+       "iv_rv_ratio": 1.4366012277770654,
        "iv_average": 0.12545,
-       "iv_change_ratio": 0.9569549621363092,
+       "iv_change_ratio": 0.9469908330011956,
        "trend_condition": "clear uptrend",
-       "ma_short": 766.886,
-       "ma_long": 762.9536666666667,
-       "separation": 0.00508559333359195
+       "ma_short": 766.8770000000001,
+       "ma_long": 762.9506666666667,
+       "separation": 0.005078588998186986
       }
      },
      {
-      "id": 2506,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2542,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "MARKET_ANALYSIS",
       "symbol": "QQQ",
-      "message": "QQQ: premium elevated (ATM IV 0.1734 vs RV 0.135), range-bound (MA separation 0.0049)",
+      "message": "QQQ: premium elevated (ATM IV 0.1789 vs RV 0.1354), range-bound (MA separation 0.005)",
       "payload": {
        "iv_condition": "premium elevated",
-       "atm_iv": 0.1734,
-       "realized_vol": 0.13495781817106278,
-       "iv_rv_ratio": 1.2848459048160565,
+       "atm_iv": 0.1789,
+       "realized_vol": 0.13536433596104153,
+       "iv_rv_ratio": 1.3216184213505708,
        "iv_average": 0.17885,
-       "iv_change_ratio": 0.9695275370422141,
+       "iv_change_ratio": 1.0002795638803466,
        "trend_condition": "range-bound",
-       "ma_short": 713.0440000000001,
-       "ma_long": 709.5,
-       "separation": 0.004940302356541086
+       "ma_short": 713.0699999999999,
+       "ma_long": 709.5086666666667,
+       "separation": 0.004965260834204544
       }
      },
      {
-      "id": 2513,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2549,
+      "ts": "2026-09-03T20:05:57+00:00",
       "stage": "MARKET_ANALYSIS",
       "symbol": "IWM",
-      "message": "IWM: premium elevated (ATM IV 0.1904 vs RV 0.1283), range-bound (MA separation -0.0037)",
+      "message": "IWM: premium elevated (ATM IV 0.1942 vs RV 0.1284), range-bound (MA separation -0.0037)",
       "payload": {
        "iv_condition": "premium elevated",
-       "atm_iv": 0.19035000000000002,
-       "realized_vol": 0.12828441897087753,
-       "iv_rv_ratio": 1.4838123096087943,
+       "atm_iv": 0.19424999999999998,
+       "realized_vol": 0.12835401586381012,
+       "iv_rv_ratio": 1.5133924614100793,
        "iv_average": 0.16904999999999998,
-       "iv_change_ratio": 1.1259982253771077,
+       "iv_change_ratio": 1.1490683229813665,
        "trend_condition": "range-bound",
-       "ma_short": 296.5295,
-       "ma_long": 297.6188333333333,
-       "separation": -0.0036907161773757622
+       "ma_short": 296.534,
+       "ma_long": 297.62033333333335,
+       "separation": -0.0036809885244421157
       }
      }
     ]
@@ -174,8 +174,8 @@
     "count": 6,
     "events": [
      {
-      "id": 2500,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2536,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "STRATEGY_SELECTION",
       "symbol": "SPY",
       "message": "SPY: bull put credit spread \u2014 premium elevated with a clear uptrend: collect premium with defined risk below the market",
@@ -187,20 +187,20 @@
       }
      },
      {
-      "id": 2501,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2537,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "STRATEGY_SELECTION",
       "symbol": "SPY",
-      "message": "SPY: bull put credit spread 2026-09-04 [SELL 770P / BUY 765P] \u2014 credit $55.00, width $500.00, max loss $445.00",
+      "message": "SPY: bull put credit spread 2026-09-04 [SELL 770P / BUY 765P] \u2014 credit $62.50, width $500.00, max loss $437.50",
       "payload": {
        "structure": "bull put credit spread",
        "expiry": "2026-09-04",
        "dte": 1,
-       "credit": 55.0,
+       "credit": 62.5,
        "width": 5.0,
-       "max_loss": 445.0,
+       "max_loss": 437.5,
        "breakevens": [
-        769.45
+        769.38
        ],
        "legs": [
         {
@@ -208,7 +208,7 @@
          "side": "sell",
          "strike": 770.0,
          "right": "P",
-         "delta": -0.2535,
+         "delta": -0.2767,
          "open_interest": 10237
         },
         {
@@ -216,15 +216,15 @@
          "side": "buy",
          "strike": 765.0,
          "right": "P",
-         "delta": -0.0796,
+         "delta": -0.0729,
          "open_interest": 49627
         }
        ]
       }
      },
      {
-      "id": 2507,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2543,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "STRATEGY_SELECTION",
       "symbol": "QQQ",
       "message": "QQQ: iron condor \u2014 premium elevated with no clear trend: collect premium on both sides with defined risk both ways",
@@ -236,21 +236,21 @@
       }
      },
      {
-      "id": 2508,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2544,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "STRATEGY_SELECTION",
       "symbol": "QQQ",
-      "message": "QQQ: iron condor 2026-09-04 [SELL 713P / BUY 708P / SELL 721C / BUY 726C] \u2014 credit $157.00, width $500.00, max loss $343.00",
+      "message": "QQQ: iron condor 2026-09-04 [SELL 713P / BUY 708P / SELL 721C / BUY 726C] \u2014 credit $163.00, width $500.00, max loss $337.00",
       "payload": {
        "structure": "iron condor",
        "expiry": "2026-09-04",
        "dte": 1,
-       "credit": 157.0,
+       "credit": 163.0,
        "width": 5.0,
-       "max_loss": 343.0,
+       "max_loss": 337.0,
        "breakevens": [
-        711.43,
-        722.57
+        711.37,
+        722.63
        ],
        "legs": [
         {
@@ -258,7 +258,7 @@
          "side": "sell",
          "strike": 713.0,
          "right": "P",
-         "delta": -0.2509,
+         "delta": -0.2527,
          "open_interest": 1058
         },
         {
@@ -266,7 +266,7 @@
          "side": "buy",
          "strike": 708.0,
          "right": "P",
-         "delta": -0.0982,
+         "delta": -0.0917,
          "open_interest": 2850
         },
         {
@@ -274,7 +274,7 @@
          "side": "sell",
          "strike": 721.0,
          "right": "C",
-         "delta": 0.2896,
+         "delta": 0.288,
          "open_interest": 1443
         },
         {
@@ -282,15 +282,15 @@
          "side": "buy",
          "strike": 726.0,
          "right": "C",
-         "delta": 0.0841,
+         "delta": 0.0837,
          "open_interest": 2938
         }
        ]
       }
      },
      {
-      "id": 2514,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2550,
+      "ts": "2026-09-03T20:05:57+00:00",
       "stage": "STRATEGY_SELECTION",
       "symbol": "IWM",
       "message": "IWM: iron condor \u2014 premium elevated with no clear trend: collect premium on both sides with defined risk both ways",
@@ -302,21 +302,21 @@
       }
      },
      {
-      "id": 2515,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2551,
+      "ts": "2026-09-03T20:05:57+00:00",
       "stage": "STRATEGY_SELECTION",
       "symbol": "IWM",
-      "message": "IWM: iron condor 2026-09-04 [SELL 293P / BUY 288P / SELL 297C / BUY 302C] \u2014 credit $86.00, width $500.00, max loss $414.00",
+      "message": "IWM: iron condor 2026-09-04 [SELL 293P / BUY 288P / SELL 297C / BUY 302C] \u2014 credit $85.00, width $500.00, max loss $415.00",
       "payload": {
        "structure": "iron condor",
        "expiry": "2026-09-04",
        "dte": 1,
-       "credit": 86.0,
+       "credit": 85.0,
        "width": 5.0,
-       "max_loss": 414.0,
+       "max_loss": 415.0,
        "breakevens": [
-        292.14,
-        297.86
+        292.15,
+        297.85
        ],
        "legs": [
         {
@@ -324,7 +324,7 @@
          "side": "sell",
          "strike": 293.0,
          "right": "P",
-         "delta": -0.2377,
+         "delta": -0.2391,
          "open_interest": 4684
         },
         {
@@ -332,7 +332,7 @@
          "side": "buy",
          "strike": 288.0,
          "right": "P",
-         "delta": -0.0193,
+         "delta": -0.0392,
          "open_interest": 4988
         },
         {
@@ -340,7 +340,7 @@
          "side": "sell",
          "strike": 297.0,
          "right": "C",
-         "delta": 0.2731,
+         "delta": 0.2708,
          "open_interest": 2512
         },
         {
@@ -348,7 +348,7 @@
          "side": "buy",
          "strike": 302.0,
          "right": "C",
-         "delta": 0.0319,
+         "delta": 0.0139,
          "open_interest": 1112
         }
        ]
@@ -363,11 +363,11 @@
     "count": 3,
     "events": [
      {
-      "id": 2502,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2538,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "OPPORTUNITY_EVALUATION",
       "symbol": "SPY",
-      "message": "SPY: score 0/100 -> REJECT (hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 1 (bias +1))",
+      "message": "SPY: score 0/100 -> REJECT (hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 1 (bias +1))",
       "payload": {
        "score": 0,
        "state": "REJECT",
@@ -378,7 +378,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "ATM IV 0.1200 vs realized vol 0.0829 = ratio 1.448",
+         "measured": "ATM IV 0.1188 vs realized vol 0.0827 = ratio 1.437",
          "threshold": "ATM IV >= 1.2 x 20-day realized vol",
          "points": 15,
          "awarded": 15,
@@ -404,7 +404,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "MA separation 0.0051 of price (MA short 766.89, MA long 762.95); structure bull put credit spread wants a clear trend",
+         "measured": "MA separation 0.0051 of price (MA short 766.88, MA long 762.95); structure bull put credit spread wants a clear trend",
          "threshold": "directional structure requires a clear trend: |MA separation| > 0.0050 of price",
          "points": 15,
          "awarded": 15,
@@ -430,7 +430,7 @@
          "passed": false,
          "evaluable": true,
          "state": "FAIL",
-         "measured": "credit $55.00 / width $500.00 = 0.110",
+         "measured": "credit $62.50 / width $500.00 = 0.125",
          "threshold": "credit / spread width >= 0.14",
          "points": 15,
          "awarded": 0,
@@ -443,7 +443,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "short-strike delta 0.254",
+         "measured": "short-strike delta 0.277",
          "threshold": "short-strike |delta| <= 0.3",
          "points": 10,
          "awarded": 10,
@@ -456,7 +456,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "bid-ask 0.06 pts = 10.9% of credit $55.00; min open interest 10237",
+         "measured": "bid-ask 0.03 pts = 4.8% of credit $62.50; min open interest 10237",
          "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
          "points": 10,
          "awarded": 10,
@@ -482,7 +482,7 @@
          "passed": false,
          "evaluable": true,
          "state": "FAIL",
-         "measured": "open positions 4 (+1 proposed); same-direction positions 1 (bias +1)",
+         "measured": "open positions 5 (+1 proposed); same-direction positions 1 (bias +1)",
          "threshold": "position count <= 4 and same-direction positions <= 3",
          "points": 5,
          "awarded": 0,
@@ -496,22 +496,22 @@
         "passed": false,
         "evaluable": true,
         "state": "FAIL",
-        "measured": "open positions 4 (+1 proposed); same-direction positions 1 (bias +1)",
+        "measured": "open positions 5 (+1 proposed); same-direction positions 1 (bias +1)",
         "threshold": "position count <= 4 and same-direction positions <= 3",
         "points": 5,
         "awarded": 0,
         "available": 5,
         "hard_gate": true
        },
-       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 1 (bias +1)"
+       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 1 (bias +1)"
       }
      },
      {
-      "id": 2509,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2545,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "OPPORTUNITY_EVALUATION",
       "symbol": "QQQ",
-      "message": "QQQ: score 0/100 -> REJECT (hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0))",
+      "message": "QQQ: score 0/100 -> REJECT (hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0))",
       "payload": {
        "score": 0,
        "state": "REJECT",
@@ -522,7 +522,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "ATM IV 0.1734 vs realized vol 0.1350 = ratio 1.285",
+         "measured": "ATM IV 0.1789 vs realized vol 0.1354 = ratio 1.322",
          "threshold": "ATM IV >= 1.2 x 20-day realized vol",
          "points": 15,
          "awarded": 15,
@@ -548,7 +548,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "MA separation 0.0049 of price (MA short 713.04, MA long 709.50); structure iron condor wants range-bound",
+         "measured": "MA separation 0.0050 of price (MA short 713.07, MA long 709.51); structure iron condor wants range-bound",
          "threshold": "iron condor requires a range-bound tape: |MA separation| <= 0.0050 of price",
          "points": 15,
          "awarded": 15,
@@ -574,7 +574,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "credit $157.00 / width $500.00 = 0.314",
+         "measured": "credit $163.00 / width $500.00 = 0.326",
          "threshold": "credit / spread width >= 0.14",
          "points": 15,
          "awarded": 15,
@@ -587,7 +587,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "short-strike delta 0.290",
+         "measured": "short-strike delta 0.288",
          "threshold": "short-strike |delta| <= 0.3",
          "points": 10,
          "awarded": 10,
@@ -600,7 +600,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "bid-ask 0.08 pts = 5.1% of credit $157.00; min open interest 1058",
+         "measured": "bid-ask 0.10 pts = 6.1% of credit $163.00; min open interest 1058",
          "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
          "points": 10,
          "awarded": 10,
@@ -626,7 +626,7 @@
          "passed": false,
          "evaluable": true,
          "state": "FAIL",
-         "measured": "open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
+         "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
          "threshold": "position count <= 4 and same-direction positions <= 3",
          "points": 5,
          "awarded": 0,
@@ -640,22 +640,22 @@
         "passed": false,
         "evaluable": true,
         "state": "FAIL",
-        "measured": "open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
+        "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
         "threshold": "position count <= 4 and same-direction positions <= 3",
         "points": 5,
         "awarded": 0,
         "available": 5,
         "hard_gate": true
        },
-       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)"
+       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)"
       }
      },
      {
-      "id": 2516,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2552,
+      "ts": "2026-09-03T20:05:57+00:00",
       "stage": "OPPORTUNITY_EVALUATION",
       "symbol": "IWM",
-      "message": "IWM: score 0/100 -> REJECT (hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0))",
+      "message": "IWM: score 0/100 -> REJECT (hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0))",
       "payload": {
        "score": 0,
        "state": "REJECT",
@@ -666,7 +666,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "ATM IV 0.1904 vs realized vol 0.1283 = ratio 1.484",
+         "measured": "ATM IV 0.1942 vs realized vol 0.1284 = ratio 1.513",
          "threshold": "ATM IV >= 1.2 x 20-day realized vol",
          "points": 15,
          "awarded": 15,
@@ -718,7 +718,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "credit $86.00 / width $500.00 = 0.172",
+         "measured": "credit $85.00 / width $500.00 = 0.170",
          "threshold": "credit / spread width >= 0.14",
          "points": 15,
          "awarded": 15,
@@ -731,7 +731,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "short-strike delta 0.273",
+         "measured": "short-strike delta 0.271",
          "threshold": "short-strike |delta| <= 0.3",
          "points": 10,
          "awarded": 10,
@@ -744,7 +744,7 @@
          "passed": true,
          "evaluable": true,
          "state": "PASS",
-         "measured": "bid-ask 0.04 pts = 4.7% of credit $86.00; min open interest 1112",
+         "measured": "bid-ask 0.08 pts = 9.4% of credit $85.00; min open interest 1112",
          "threshold": "bid-ask <= 25% of credit and open interest >= 100 per leg",
          "points": 10,
          "awarded": 10,
@@ -770,7 +770,7 @@
          "passed": false,
          "evaluable": true,
          "state": "FAIL",
-         "measured": "open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
+         "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
          "threshold": "position count <= 4 and same-direction positions <= 3",
          "points": 5,
          "awarded": 0,
@@ -784,14 +784,14 @@
         "passed": false,
         "evaluable": true,
         "state": "FAIL",
-        "measured": "open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
+        "measured": "open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
         "threshold": "position count <= 4 and same-direction positions <= 3",
         "points": 5,
         "awarded": 0,
         "available": 5,
         "hard_gate": true
        },
-       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)"
+       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)"
       }
      }
     ]
@@ -810,60 +810,60 @@
     "count": 3,
     "events": [
      {
-      "id": 2503,
-      "ts": "2026-09-03T19:50:56+00:00",
+      "id": 2539,
+      "ts": "2026-09-03T20:05:55+00:00",
       "stage": "FINAL_DECISION",
       "symbol": "SPY",
-      "message": "SPY: REJECT \u2014 hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 1 (bias +1)",
+      "message": "SPY: REJECT \u2014 hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 1 (bias +1)",
       "payload": {
-       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 1 (bias +1)"
+       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 1 (bias +1)"
       }
      },
      {
-      "id": 2510,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2546,
+      "ts": "2026-09-03T20:05:56+00:00",
       "stage": "FINAL_DECISION",
       "symbol": "QQQ",
-      "message": "QQQ: REJECT \u2014 hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
+      "message": "QQQ: REJECT \u2014 hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
       "payload": {
-       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)"
+       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)"
       }
      },
      {
-      "id": 2517,
-      "ts": "2026-09-03T19:50:57+00:00",
+      "id": 2553,
+      "ts": "2026-09-03T20:05:57+00:00",
       "stage": "FINAL_DECISION",
       "symbol": "IWM",
-      "message": "IWM: REJECT \u2014 hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)",
+      "message": "IWM: REJECT \u2014 hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)",
       "payload": {
-       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 4 (+1 proposed); same-direction positions 0 (bias +0)"
+       "reason": "hard gate #9 portfolio fit failed \u2014 open positions 5 (+1 proposed); same-direction positions 0 (bias +0)"
       }
      }
     ]
    }
   ],
-  "started": "2026-09-03T19:50:52+00:00",
-  "ended": "2026-09-03T19:51:00+00:00",
+  "started": "2026-09-03T20:05:52+00:00",
+  "ended": "2026-09-03T20:05:59+00:00",
   "complete": true,
   "other_events": [
    {
-    "id": 2488,
-    "ts": "2026-09-03T19:50:53+00:00",
+    "id": 2524,
+    "ts": "2026-09-03T20:05:53+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": null,
     "message": "Reconciliation pass started \u2014 treating the broker as source of truth",
     "payload": null
    },
    {
-    "id": 2489,
-    "ts": "2026-09-03T19:50:53+00:00",
+    "id": 2525,
+    "ts": "2026-09-03T20:05:53+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": "IWM",
     "message": "RECONCILED ADOPTED \u2014 IWM iron condor x4 credit $332.00 expiry 2026-09-03; broker held this position, the store did not. Exit rules now manage it (take profit at 50% of credit (close <= $166.00), stop at 2x credit (close >= $664.00), flatten at 15:30 ET on the expiry date)",
     "payload": {
      "reconcile": "RECONCILED_ADOPTED",
      "source": "order:d91a2feb-5329-40f3-b9fa-e921d809eedc",
-     "position_key": "IWM|iron condor|2026-09-03|9d824c1c#3",
+     "position_key": "IWM|iron condor|2026-09-03|9d824c1c#4",
      "symbol": "IWM",
      "structure": "iron condor",
      "expiry": "2026-09-03",
@@ -908,8 +908,8 @@
     }
    },
    {
-    "id": 2490,
-    "ts": "2026-09-03T19:50:53+00:00",
+    "id": 2526,
+    "ts": "2026-09-03T20:05:53+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": null,
     "message": "Reconciliation complete \u2014 1 adopted, 0 closed as missing, 0 kept with a working entry order, 4 matched, 0 dry-run skipped",
@@ -957,7 +957,7 @@
          "right": "C"
         }
        ],
-       "position_key": "IWM|iron condor|2026-09-03|9d824c1c#3",
+       "position_key": "IWM|iron condor|2026-09-03|9d824c1c#4",
        "already_present": false
       }
      ],
@@ -970,8 +970,8 @@
     }
    },
    {
-    "id": 2491,
-    "ts": "2026-09-03T19:50:53+00:00",
+    "id": 2527,
+    "ts": "2026-09-03T20:05:53+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": null,
     "message": "Reviewing 5 open position(s) against exit rules",
@@ -982,93 +982,105 @@
     }
    },
    {
-    "id": 2492,
-    "ts": "2026-09-03T19:50:54+00:00",
+    "id": 2528,
+    "ts": "2026-09-03T20:05:54+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": "SPY",
-    "message": "SPY iron condor held \u2014 cost to close $1012.50, credit $660.00",
+    "message": "SPY iron condor held \u2014 cost to close $912.50, credit $660.00",
     "payload": {
      "credit": 660.0,
-     "cost_to_close": 1012.5000000000001,
+     "cost_to_close": 912.4999999999998,
      "dte": 1,
      "profit_target": 330.0,
      "stop_loss": 1320.0
     }
    },
    {
-    "id": 2493,
-    "ts": "2026-09-03T19:50:54+00:00",
+    "id": 2529,
+    "ts": "2026-09-03T20:05:54+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": "QQQ",
-    "message": "QQQ iron condor held \u2014 cost to close $1740.00, credit $1038.00",
+    "message": "QQQ iron condor held \u2014 cost to close $1824.00, credit $1038.00",
     "payload": {
      "credit": 1038.0,
-     "cost_to_close": 1739.9999999999995,
+     "cost_to_close": 1824.0,
      "dte": 1,
      "profit_target": 519.0,
      "stop_loss": 2076.0
     }
    },
    {
-    "id": 2494,
-    "ts": "2026-09-03T19:50:54+00:00",
+    "id": 2530,
+    "ts": "2026-09-03T20:05:54+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": "IWM",
-    "message": "IWM iron condor held \u2014 cost to close $274.00, credit $342.00",
+    "message": "IWM iron condor held \u2014 cost to close $290.00, credit $342.00",
     "payload": {
      "credit": 342.0,
-     "cost_to_close": 274.0,
+     "cost_to_close": 290.0,
      "dte": 1,
      "profit_target": 171.0,
      "stop_loss": 684.0
     }
    },
    {
-    "id": 2495,
-    "ts": "2026-09-03T19:50:54+00:00",
+    "id": 2531,
+    "ts": "2026-09-03T20:05:54+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": "SPY",
-    "message": "SPY bull put credit spread held \u2014 cost to close $216.00, credit $220.00",
+    "message": "SPY bull put credit spread held \u2014 cost to close $250.00, credit $220.00",
     "payload": {
      "credit": 220.0,
-     "cost_to_close": 216.0,
+     "cost_to_close": 250.0,
      "dte": 1,
      "profit_target": 110.0,
      "stop_loss": 440.0
     }
    },
    {
-    "id": 2496,
-    "ts": "2026-09-03T19:50:54+00:00",
+    "id": 2532,
+    "ts": "2026-09-03T20:05:54+00:00",
     "stage": "POSITION_MANAGEMENT",
     "symbol": "IWM",
-    "message": "POSITION CLOSED \u2014 IWM iron condor: expiry-day close: 15:30 ET on the 2026-09-03 expiry reached \u2014 flattening to avoid assignment",
+    "message": "EXIT DEFERRED \u2014 IWM iron condor would exit now (expiry-day close: 15:30 ET on the 2026-09-03 expiry reached \u2014 flattening to avoid assignment) but the market is closed; it will be acted on at the next open",
     "payload": {
-     "client_order_id": "oaa-close-52264e11dca23ee3f477",
-     "broker_order_id": null,
+     "deferred": "MARKET_CLOSED",
      "reason": "expiry-day close: 15:30 ET on the 2026-09-03 expiry reached \u2014 flattening to avoid assignment",
-     "realized_pnl": -126.0,
-     "status": "submitted"
+     "credit": 332.0,
+     "cost_to_close": 460.00000000000006,
+     "expiry_day_close_time": "15:30:00"
     }
    },
    {
-    "id": 2518,
-    "ts": "2026-09-03T19:50:57+00:00",
+    "id": 2554,
+    "ts": "2026-09-03T20:05:57+00:00",
     "stage": "BASELINE",
     "symbol": null,
-    "message": "Baselines \u2014 unfiltered 210 setup(s); passive SPY 1.4538",
+    "message": "Baselines \u2014 unfiltered 213 setup(s); passive SPY 1.4387",
     "payload": {
-     "unfiltered_setups": 210,
-     "unfiltered_notional_credit": 19075.5,
+     "unfiltered_setups": 213,
+     "unfiltered_notional_credit": 19386.0,
      "passive_symbol": "SPY",
      "passive_first_price": 762.15,
-     "passive_last_price": 773.23,
-     "passive_return_pct": 1.4538
+     "passive_last_price": 773.115,
+     "passive_return_pct": 1.4387
     }
    }
   ]
  },
  "cycles": [
+  {
+   "cycle_id": "c3dfeb024641",
+   "started": "2026-09-03T20:05:52+00:00",
+   "ended": "2026-09-03T20:05:59+00:00",
+   "events": 34
+  },
+  {
+   "cycle_id": "27ad3df8a251",
+   "started": "2026-09-03T19:51:00+00:00",
+   "ended": "2026-09-03T19:51:02+00:00",
+   "events": 2
+  },
   {
    "cycle_id": "c1ca80f9b4d4",
    "started": "2026-09-03T19:50:52+00:00",
@@ -1175,18 +1187,6 @@
    "cycle_id": "507d999cc9a8",
    "started": "2026-09-03T17:50:52+00:00",
    "ended": "2026-09-03T17:50:58+00:00",
-   "events": 32
-  },
-  {
-   "cycle_id": "24a99cd7e1f6",
-   "started": "2026-09-03T17:35:59+00:00",
-   "ended": "2026-09-03T17:36:01+00:00",
-   "events": 2
-  },
-  {
-   "cycle_id": "c0fbd1cf0b0b",
-   "started": "2026-09-03T17:35:52+00:00",
-   "ended": "2026-09-03T17:35:59+00:00",
    "events": 32
   }
  ]
