@@ -1,8 +1,8 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T10:50:59.264395-04:00",
-  "generated_at_display": "10:50 EDT",
-  "generated_at_utc": "2026-09-03T14:50:59.264446+00:00",
+  "generated_at": "2026-09-03T11:05:59.275973-04:00",
+  "generated_at_display": "11:05 EDT",
+  "generated_at_utc": "2026-09-03T15:05:59.276015+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
@@ -233,62 +233,6 @@
     774.32
    ],
    "reconciled": false
-  },
-  {
-   "dry_run": false,
-   "symbol": "QQQ",
-   "structure": "iron condor",
-   "contracts": 6,
-   "credit": 1071.0,
-   "width": 5.0,
-   "max_loss": 1929.0,
-   "expiry": "2026-09-03",
-   "opened_ts": "2026-09-02T13:50:31+00:00",
-   "legs": [
-    {
-     "symbol": "QQQ260903P00702000",
-     "side": "sell",
-     "position_intent": "sell_to_open",
-     "ratio_qty": 1,
-     "strike": 702.0,
-     "right": "P"
-    },
-    {
-     "symbol": "QQQ260903P00697000",
-     "side": "buy",
-     "position_intent": "buy_to_open",
-     "ratio_qty": 1,
-     "strike": 697.0,
-     "right": "P"
-    },
-    {
-     "symbol": "QQQ260903C00711000",
-     "side": "sell",
-     "position_intent": "sell_to_open",
-     "ratio_qty": 1,
-     "strike": 711.0,
-     "right": "C"
-    },
-    {
-     "symbol": "QQQ260903C00716000",
-     "side": "buy",
-     "position_intent": "buy_to_open",
-     "ratio_qty": 1,
-     "strike": 716.0,
-     "right": "C"
-    }
-   ],
-   "exit_plan": {
-    "profit_target_cost_to_close": 535.5,
-    "stop_loss_cost_to_close": 2142.0,
-    "time_exit_dte": 0,
-    "credit_collected": 1071.0
-   },
-   "breakevens": [
-    700.22,
-    712.78
-   ],
-   "reconciled": false
   }
  ],
  "closed": [
@@ -331,6 +275,16 @@
    "realized_pnl": -466.0,
    "exit_reason": "stop loss: cost to close $816.00 at or above 2x the $350.00 credit ($700.00)",
    "closed_ts": "2026-09-03T13:35:54+00:00"
+  },
+  {
+   "dry_run": false,
+   "symbol": "QQQ",
+   "structure": "iron condor",
+   "contracts": 6,
+   "credit": 1071.0,
+   "realized_pnl": -1155.0000000000005,
+   "exit_reason": "stop loss: cost to close $2226.00 at or above 2x the $1071.00 credit ($2142.00)",
+   "closed_ts": "2026-09-03T15:05:54+00:00"
   },
   {
    "dry_run": false,
@@ -413,7 +367,7 @@
    "closed_ts": "2026-09-01T22:34:02+00:00"
   }
  ],
- "open_count": 5,
+ "open_count": 4,
  "dry_run_open_count": 0,
  "dry_run_closed_count": 7,
  "limit": 4

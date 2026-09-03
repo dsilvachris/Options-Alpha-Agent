@@ -1,14 +1,14 @@
 {
  "meta": {
-  "generated_at": "2026-09-03T10:50:59.264395-04:00",
-  "generated_at_display": "10:50 EDT",
-  "generated_at_utc": "2026-09-03T14:50:59.264446+00:00",
+  "generated_at": "2026-09-03T11:05:59.275973-04:00",
+  "generated_at_display": "11:05 EDT",
+  "generated_at_utc": "2026-09-03T15:05:59.276015+00:00",
   "timezone": "America/New_York",
   "market_open": true,
   "mode": "static",
   "dry_run": false
  },
- "realized_pnl": 162.0,
+ "realized_pnl": -993.0,
  "open_positions": [
   {
    "id": 17,
@@ -92,27 +92,6 @@
    "exit_reason": null,
    "realized_pnl": null,
    "detail": "{\"dry_run\": false, \"breakevens\": [763.68, 774.32], \"exit_plan\": {\"profit_target_cost_to_close\": 330.0, \"stop_loss_cost_to_close\": 1320.0, \"time_exit_dte\": -1, \"expiry_day_close_et\": \"15:30 ET\", \"credit_collected\": 660.0}, \"credit_per_contract\": 132.0, \"max_loss_per_contract\": 368.0}",
-   "dry_run": 0
-  },
-  {
-   "id": 9,
-   "position_key": "QQQ|iron condor|2026-09-03|7b35adc2#0",
-   "symbol": "QQQ",
-   "structure": "iron condor",
-   "opened_ts": "2026-09-02T13:50:31+00:00",
-   "closed_ts": null,
-   "status": "OPEN",
-   "contracts": 6,
-   "credit": 1071.0,
-   "width": 5.0,
-   "max_loss": 1929.0,
-   "expiry": "2026-09-03",
-   "legs": "[{\"symbol\": \"QQQ260903P00702000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 702.0, \"right\": \"P\"}, {\"symbol\": \"QQQ260903P00697000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 697.0, \"right\": \"P\"}, {\"symbol\": \"QQQ260903C00711000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 711.0, \"right\": \"C\"}, {\"symbol\": \"QQQ260903C00716000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 716.0, \"right\": \"C\"}]",
-   "entry_order_id": "oaa-open-20bc4246814688c10d98",
-   "exit_order_id": null,
-   "exit_reason": null,
-   "realized_pnl": null,
-   "detail": "{\"dry_run\": false, \"breakevens\": [700.22, 712.78], \"exit_plan\": {\"profit_target_cost_to_close\": 535.5, \"stop_loss_cost_to_close\": 2142.0, \"time_exit_dte\": 0, \"credit_collected\": 1071.0}, \"credit_per_contract\": 178.5, \"max_loss_per_contract\": 321.5}",
    "dry_run": 0
   }
  ],
@@ -202,6 +181,27 @@
    "dry_run": 0
   },
   {
+   "id": 9,
+   "position_key": "QQQ|iron condor|2026-09-03|7b35adc2#0",
+   "symbol": "QQQ",
+   "structure": "iron condor",
+   "opened_ts": "2026-09-02T13:50:31+00:00",
+   "closed_ts": "2026-09-03T15:05:54+00:00",
+   "status": "CLOSED",
+   "contracts": 6,
+   "credit": 1071.0,
+   "width": 5.0,
+   "max_loss": 1929.0,
+   "expiry": "2026-09-03",
+   "legs": "[{\"symbol\": \"QQQ260903P00702000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 702.0, \"right\": \"P\"}, {\"symbol\": \"QQQ260903P00697000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 697.0, \"right\": \"P\"}, {\"symbol\": \"QQQ260903C00711000\", \"side\": \"sell\", \"position_intent\": \"sell_to_open\", \"ratio_qty\": 1, \"strike\": 711.0, \"right\": \"C\"}, {\"symbol\": \"QQQ260903C00716000\", \"side\": \"buy\", \"position_intent\": \"buy_to_open\", \"ratio_qty\": 1, \"strike\": 716.0, \"right\": \"C\"}]",
+   "entry_order_id": "oaa-open-20bc4246814688c10d98",
+   "exit_order_id": "oaa-close-9a2890f9369c2416f2f9",
+   "exit_reason": "stop loss: cost to close $2226.00 at or above 2x the $1071.00 credit ($2142.00)",
+   "realized_pnl": -1155.0000000000005,
+   "detail": "{\"dry_run\": false, \"breakevens\": [700.22, 712.78], \"exit_plan\": {\"profit_target_cost_to_close\": 535.5, \"stop_loss_cost_to_close\": 2142.0, \"time_exit_dte\": 0, \"credit_collected\": 1071.0}, \"credit_per_contract\": 178.5, \"max_loss_per_contract\": 321.5}",
+   "dry_run": 0
+  },
+  {
    "id": 8,
    "position_key": "SPY|bull put credit spread|2026-09-03|862e9f38#0",
    "symbol": "SPY",
@@ -225,7 +225,7 @@
  ],
  "exits_by_reason": {
   "profit target": 3,
-  "stop loss": 1,
+  "stop loss": 2,
   "other": 1
  },
  "equity_curve": [
@@ -585,12 +585,19 @@
    "equity": 100470.69,
    "last_equity": 99849.59,
    "cycle_id": "4f759fb0b316"
+  },
+  {
+   "id": 52,
+   "ts": "2026-09-03T15:05:53+00:00",
+   "equity": 98642.69,
+   "last_equity": 99849.59,
+   "cycle_id": "8a29341de019"
   }
  ],
  "avg_score_executed": 96.5,
  "n_executed": 17,
- "avg_score_declined": 10.8,
- "n_declined": 138,
+ "avg_score_declined": 10.5,
+ "n_declined": 141,
  "dry_run_open": 0,
  "dry_run_closed": 7,
  "dry_run_notional_pnl": 0.0
